@@ -169,12 +169,37 @@ func (c *Client) connect() error {
 	c.connAlive = alive
 	c.connMu.Unlock()
 
-	// Authenticate
+	// Authenticate and wait for Ack
 	if err := c.sendFrame(protocol.MsgAuth, &protocol.AuthPayload{Token: c.token}); err != nil {
 		c.closeConn()
 		return fmt.Errorf("send auth: %w", err)
 	}
 
+	// Read auth response before proceeding
+	_, frame, err := conn.ReadMessage()
+	if err != nil {
+		c.closeConn()
+		return fmt.Errorf("read auth response: %w", err)
+	}
+	msgType, raw, err := c.codec.Decode(frame)
+	if err != nil {
+		c.closeConn()
+		return fmt.Errorf("decode auth response: %w", err)
+	}
+	if msgType == protocol.MsgError {
+		p, _ := protocol.DecodePayload[protocol.ErrorPayload](raw)
+		c.closeConn()
+		if p != nil {
+			return fmt.Errorf("auth rejected: [%d] %s", p.Code, p.Msg)
+		}
+		return fmt.Errorf("auth rejected")
+	}
+	if msgType != protocol.MsgAck {
+		c.closeConn()
+		return fmt.Errorf("unexpected response to auth: message type %d", msgType)
+	}
+
+	log.Println("connected and authenticated")
 	go c.pingLoop(alive)
 
 	return nil

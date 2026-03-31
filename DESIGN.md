@@ -32,7 +32,7 @@ Every WebSocket message is a binary frame with this layout:
                             (big-endian)
 ```
 
-**Header (6 bytes)**
+**Header (7 bytes)**
 
 | Field  | Size | Description |
 |--------|------|-------------|

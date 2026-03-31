@@ -95,10 +95,9 @@ func (c *Codec) Encode(msgType MsgType, payload any) ([]byte, error) {
 		}
 	}
 
+	// Compression disabled — server does not support zstd yet.
+	// When enabled, uncomment and call c.maybeCompress(body).
 	var flags byte
-	if len(body) > 0 {
-		body, flags = c.maybeCompress(body)
-	}
 
 	frame := make([]byte, HeaderSize+len(body))
 	frame[0] = Version
