@@ -15,9 +15,7 @@ const (
 
 	FlagCompressed = 0x01
 
-	// Compression thresholds
-	compressAlways = 1024
-	compressNever  = 256
+	compressThreshold = 1024
 
 	MaxPayloadSize = 10 * 1024 * 1024 // 10 MB
 )
@@ -95,9 +93,10 @@ func (c *Codec) Encode(msgType MsgType, payload any) ([]byte, error) {
 		}
 	}
 
-	// Compression disabled — server does not support zstd yet.
-	// When enabled, uncomment and call c.maybeCompress(body).
 	var flags byte
+	if len(body) > 0 {
+		body, flags = c.maybeCompress(body)
+	}
 
 	frame := make([]byte, HeaderSize+len(body))
 	frame[0] = Version
@@ -154,19 +153,11 @@ func DecodePayload[T any](raw []byte) (*T, error) {
 }
 
 func (c *Codec) maybeCompress(data []byte) ([]byte, byte) {
-	if len(data) <= compressNever {
+	if len(data) <= compressThreshold {
 		return data, 0
 	}
-
 	compressed := c.enc.EncodeAll(data, make([]byte, 0, len(data)))
-
-	if len(data) > compressAlways {
-		return compressed, FlagCompressed
-	}
-
-	// Middle range: compress only if >10% savings
-	saving := len(data) - len(compressed)
-	if saving*10 > len(data) {
+	if len(compressed) < len(data) {
 		return compressed, FlagCompressed
 	}
 	return data, 0
