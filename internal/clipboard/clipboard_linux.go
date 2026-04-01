@@ -3,13 +3,16 @@ package clipboard
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -25,11 +28,19 @@ func hasXclip() bool {
 	if !xclipChecked {
 		xclipChecked = true
 		_, err := exec.LookPath("xclip")
-		xclipFound = err == nil
-		if !xclipFound {
+		if err != nil {
 			log.Printf("xclip not found — clipboard sync will save to ~/.cache/acopy/")
 			log.Printf("install xclip for full clipboard support: %s", installHint())
+			return false
 		}
+		// Verify xclip can actually connect to a display
+		out, err := exec.Command("xclip", "-selection", "clipboard", "-o").CombinedOutput()
+		if err != nil && strings.Contains(string(out), "Can't open display") {
+			log.Printf("xclip installed but no display available — will use OSC 52 for text, cache for images")
+			log.Printf("set DISPLAY or run within a desktop session for full clipboard support")
+			return false
+		}
+		xclipFound = true
 	}
 	return xclipFound
 }
@@ -107,7 +118,7 @@ func Read() ([]byte, string, error) {
 }
 
 // Write sets the clipboard content. If xclip is available, uses it.
-// Otherwise saves to ~/.cache/acopy/ as a fallback for headless SSH.
+// Otherwise tries OSC 52 escape sequence, then falls back to cache file.
 func Write(data []byte, contentType string, clipURL string) error {
 	// For images with a URL, write the URL as text so Ctrl+V pastes it
 	if strings.HasPrefix(contentType, "image/") && clipURL != "" {
@@ -122,13 +133,84 @@ func Write(data []byte, contentType string, clipURL string) error {
 		}
 		cmd := exec.Command("xclip", args...)
 		cmd.Stdin = bytes.NewReader(data)
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
 		if err := cmd.Run(); err != nil {
+			detail := strings.TrimSpace(stderr.String())
+			if detail != "" {
+				return fmt.Errorf("xclip: %w (%s)", err, detail)
+			}
 			return fmt.Errorf("xclip: %w", err)
 		}
 		return nil
 	}
 
+	// No display — try OSC 52 (text only, most terminals cap at ~100KB)
+	if contentType == "text/plain" {
+		if err := writeOSC52(data); err == nil {
+			return nil
+		}
+	}
+
 	return saveToCache(data, contentType)
+}
+
+// writeOSC52 writes the OSC 52 escape sequence to all of the current user's
+// active PTY sessions. The terminal emulator on the other end (iTerm2, kitty,
+// alacritty, etc.) interprets it and sets its local clipboard.
+func writeOSC52(data []byte) error {
+	encoded := base64.StdEncoding.EncodeToString(data)
+	// \033]52;c;<base64>\a
+	seq := fmt.Sprintf("\033]52;c;%s\a", encoded)
+
+	// Try our own controlling terminal first
+	if tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
+		tty.WriteString(seq)
+		tty.Close()
+		return nil
+	}
+
+	// Find PTYs owned by current user (for systemd service / detached sessions)
+	uid := os.Getuid()
+	entries, err := os.ReadDir("/dev/pts")
+	if err != nil {
+		return fmt.Errorf("no terminals available")
+	}
+
+	wrote := false
+	for _, e := range entries {
+		if e.Name() == "ptmx" {
+			continue
+		}
+		// Only numeric entries are PTY slaves
+		if _, err := strconv.Atoi(e.Name()); err != nil {
+			continue
+		}
+		path := filepath.Join("/dev/pts", e.Name())
+		info, err := os.Stat(path)
+		if err != nil {
+			continue
+		}
+		stat, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			continue
+		}
+		if int(stat.Uid) != uid {
+			continue
+		}
+		f, err := os.OpenFile(path, os.O_WRONLY, 0)
+		if err != nil {
+			continue
+		}
+		f.WriteString(seq)
+		f.Close()
+		wrote = true
+	}
+
+	if !wrote {
+		return fmt.Errorf("no terminals available for OSC 52")
+	}
+	return nil
 }
 
 func saveToCache(data []byte, contentType string) error {

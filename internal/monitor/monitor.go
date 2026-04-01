@@ -83,6 +83,13 @@ func (m *Monitor) poll() {
 	m.mu.Unlock()
 
 	content, contentType, err := clipboard.Read()
+
+	// Re-snapshot change count after Read(), because on macOS reading
+	// image data via AppleScript can mutate clipboard state.
+	m.mu.Lock()
+	m.lastCount = clipboard.ChangeCount()
+	m.mu.Unlock()
+
 	if err != nil {
 		log.Printf("clipboard read: %v", err)
 		return
@@ -113,6 +120,11 @@ func (m *Monitor) poll() {
 }
 
 func (m *Monitor) onRemoteClipboard(content []byte, device string, contentType string, id string) {
+	// Ignore echoes of our own pushes (server should exclude sender, but be safe)
+	if device == m.device {
+		return
+	}
+
 	var clipURL string
 	if strings.HasPrefix(contentType, "image/") && id != "" {
 		clipURL = strings.TrimRight(m.serverURL, "/") + "/c/" + id
