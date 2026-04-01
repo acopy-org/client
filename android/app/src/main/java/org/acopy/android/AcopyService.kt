@@ -11,10 +11,11 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import golib.Golib
+import golib.Bridge
 
 class AcopyService : Service(), golib.Callback {
 
-    private var bridge: Golib.Bridge? = null
+    private var bridge: Bridge? = null
     private var clipboardBridge: ClipboardBridge? = null
     private var networkMonitor: NetworkMonitor? = null
 
