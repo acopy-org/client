@@ -81,24 +81,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-      - name: Install gomobile
-        run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          go get golang.org/x/mobile/bind@latest
-          gomobile init
-      - name: Build AAR
-        run: |
-          mkdir -p android/app/libs
-          gomobile bind -target=android -androidapi 26 -o android/app/libs/golib.aar ./golib
       - name: Build APK
         working-directory: android
         run: |
@@ -107,7 +95,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: acopy-android.apk
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
 
   release:
     needs: [build-linux-amd64, build-darwin, build-windows, build-android]
@@ -125,7 +113,7 @@ jobs:
           cp artifacts/acopy-darwin-arm64/acopy-darwin-arm64 release/
           cp artifacts/acopy-windows-amd64.exe/acopy-windows-amd64.exe release/
           cp artifacts/acopy-windows-arm64.exe/acopy-windows-arm64.exe release/
-          cp artifacts/acopy-android.apk/app-release-unsigned.apk release/acopy-android.apk
+          cp artifacts/acopy-android.apk/app-release.apk release/acopy-android.apk
           cd release && sha256sum * > checksums.txt
 
       - name: Create release
