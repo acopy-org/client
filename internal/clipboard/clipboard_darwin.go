@@ -1,23 +1,34 @@
 package clipboard
 
-/*
-#cgo CFLAGS: -x objective-c
-#cgo LDFLAGS: -framework AppKit
-#import <AppKit/AppKit.h>
-
-long getChangeCount() {
-    return [[NSPasteboard generalPasteboard] changeCount];
-}
-*/
-import "C"
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"os/exec"
+	"sync"
+)
+
+var (
+	lastHash [sha256.Size]byte
+	seqNo    int64
+	mu       sync.Mutex
 )
 
 func ChangeCount() int64 {
-	return int64(C.getChangeCount())
+	out, err := exec.Command("pbpaste").Output()
+	if err != nil {
+		return seqNo
+	}
+
+	h := sha256.Sum256(out)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if h != lastHash {
+		lastHash = h
+		seqNo++
+	}
+	return seqNo
 }
 
 func Read() ([]byte, error) {

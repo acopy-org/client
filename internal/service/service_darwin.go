@@ -21,6 +21,11 @@ var plistTmpl = template.Must(template.New("plist").Parse(`<?xml version="1.0" e
         <string>{{ .BinPath }}</string>
         <string>start</string>
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>{{ .Home }}</string>
+    </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
@@ -76,14 +81,17 @@ func Setup(binPath string) error {
 	}
 	defer f.Close()
 
+	home, _ := os.UserHomeDir()
 	err = plistTmpl.Execute(f, struct {
 		Label   string
 		BinPath string
 		LogDir  string
+		Home    string
 	}{
 		Label:   plistName,
 		BinPath: abs,
 		LogDir:  logDir(),
+		Home:    home,
 	})
 	if err != nil {
 		return fmt.Errorf("write plist: %w", err)

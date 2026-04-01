@@ -10,12 +10,10 @@ import android.content.Intent
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import golib.Golib
-import golib.Bridge
 
-class AcopyService : Service(), golib.Callback {
+class AcopyService : Service() {
 
-    private var bridge: Bridge? = null
+    private var syncClient: SyncClient? = null
     private var clipboardBridge: ClipboardBridge? = null
     private var networkMonitor: NetworkMonitor? = null
 
@@ -39,23 +37,33 @@ class AcopyService : Service(), golib.Callback {
         startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
 
         val cb = ClipboardBridge(this) { content ->
-            bridge?.pushClipboard(content, config.deviceName)
+            syncClient?.pushClipboard(content, config.deviceName)
         }
         cb.register()
         clipboardBridge = cb
 
-        try {
-            val b = Golib.newBridge(config.serverUrl, config.token, config.deviceName, this)
-            b.start()
-            bridge = b
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start bridge", e)
-            stopSelf()
-            return START_NOT_STICKY
-        }
+        val client = SyncClient(
+            serverUrl = config.serverUrl,
+            token = config.token,
+            deviceName = config.deviceName,
+            onClipboard = { content, device ->
+                clipboardBridge?.writeClipboard(content)
+                Log.d(TAG, "Clipboard updated from $device")
+            },
+            onConnectionState = { connected ->
+                val text = if (connected) "Connected" else "Reconnecting..."
+                updateNotification(text)
+                Log.d(TAG, "Connection state: $text")
+            },
+            onError = { msg ->
+                Log.e(TAG, "Sync error: $msg")
+            }
+        )
+        client.start()
+        syncClient = client
 
         networkMonitor = NetworkMonitor(this) {
-            bridge?.reconnect()
+            syncClient?.reconnect()
         }
         networkMonitor?.register()
 
@@ -65,29 +73,12 @@ class AcopyService : Service(), golib.Callback {
     override fun onDestroy() {
         networkMonitor?.unregister()
         clipboardBridge?.unregister()
-        bridge?.stop()
-        bridge = null
+        syncClient?.stop()
+        syncClient = null
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    // golib.Callback
-
-    override fun onClipboardReceived(content: ByteArray, device: String) {
-        clipboardBridge?.writeClipboard(content)
-        Log.d(TAG, "Clipboard updated from $device")
-    }
-
-    override fun onConnectionStateChanged(connected: Boolean) {
-        val text = if (connected) "Connected" else "Reconnecting..."
-        updateNotification(text)
-        Log.d(TAG, "Connection state: $text")
-    }
-
-    override fun onError(msg: String) {
-        Log.e(TAG, "Bridge error: $msg")
-    }
 
     // Notification
 

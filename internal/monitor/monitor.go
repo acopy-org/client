@@ -93,6 +93,8 @@ func (m *Monitor) poll() {
 	})
 	if err != nil {
 		log.Printf("push clipboard: %v", err)
+	} else {
+		log.Printf("pushed clipboard (%d bytes)", len(content))
 	}
 }
 

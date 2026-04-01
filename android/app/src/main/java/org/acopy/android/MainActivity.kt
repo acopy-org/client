@@ -9,16 +9,24 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.acopy.android.databinding.ActivityMainBinding
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var config: ConfigStore
+
+    private val http = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,32 +82,31 @@ class MainActivity : AppCompatActivity() {
 
         thread {
             try {
-                val url = URL(serverUrl + endpoint)
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.doOutput = true
-
                 val body = JSONObject().apply {
                     put("email", email)
                     put("password", password)
                 }
-                conn.outputStream.use { it.write(body.toString().toByteArray()) }
+                val request = Request.Builder()
+                    .url(serverUrl + endpoint)
+                    .post(body.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
 
-                val code = conn.responseCode
+                val response = http.newCall(request).execute()
+                val code = response.code
+                val respBody = response.body?.string()
+                response.close()
 
                 if (endpoint.endsWith("/register")) {
-                    if (code == 201) {
-                        // Registration succeeded, now login
-                        runOnUiThread {
-                            setLoading(false)
-                            authenticate("/api/users/login")
+                    when (code) {
+                        201 -> {
+                            runOnUiThread {
+                                setLoading(false)
+                                authenticate("/api/users/login")
+                            }
+                            return@thread
                         }
-                        return@thread
-                    } else if (code == 409) {
-                        throw Exception("Email already registered")
-                    } else {
-                        throw Exception("Registration failed (status $code)")
+                        409 -> throw Exception("Email already registered")
+                        else -> throw Exception("Registration failed (status $code)")
                     }
                 }
 
@@ -107,8 +114,7 @@ class MainActivity : AppCompatActivity() {
                 if (code == 401) throw Exception("Invalid email or password")
                 if (code != 200) throw Exception("Login failed (status $code)")
 
-                val respBody = conn.inputStream.bufferedReader().readText()
-                val json = JSONObject(respBody)
+                val json = JSONObject(respBody ?: throw Exception("Empty response"))
                 val token = json.getString("token")
 
                 config.token = token
@@ -122,7 +128,7 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 runOnUiThread {
                     setLoading(false)
-                    Toast.makeText(this, e.message, Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, e.message ?: "Connection failed", Toast.LENGTH_LONG).show()
                 }
             }
         }

@@ -1,0 +1,10 @@
+# Build outputs
+/acopy
+/android/.gradle/
+/android/app/build/
+/android/app/libs/
+
+# IDE
+.idea/
+*.iml
+local.properties
