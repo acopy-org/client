@@ -6,19 +6,29 @@ Shared clipboard across machines.
 
 **macOS / Linux:**
 
-```
+```bash
 curl -fsSL https://acopy.org/install.sh | sh
 ```
 
+The binary will be installed to:
+- macOS: `/usr/local/bin/acopy`
+- Linux: `~/.local/bin/acopy` (ensure `~/.local/bin` is in your PATH)
+
 **Windows (PowerShell):**
 
-```
+```powershell
 irm https://acopy.org/install.ps1 | iex
 ```
 
-Then run setup:
+The binary will be installed to `%LOCALAPPDATA%\acopy\`
 
-```
+**After installation:**
+
+1. Close and reopen your terminal (or refresh your PATH)
+2. Verify installation: `acopy --version`
+3. Run setup to register and install as a system service:
+
+```bash
 acopy setup
 ```
 
@@ -80,6 +90,24 @@ Three goroutines run at steady state: the clipboard monitor (500ms ticker), the 
 
 ## Build from source
 
-```
+**Prerequisites:** Go 1.21 or later
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/acopy.git
+cd acopy/client
+
+# Build the binary
 go build -o acopy ./cmd/acopy
+
+# (Optional) Install to your PATH
+# macOS/Linux:
+sudo cp acopy /usr/local/bin/  # macOS
+# or
+cp acopy ~/.local/bin/         # Linux
+
+# Windows:
+# Copy acopy.exe to a directory in your PATH
 ```
+
+After building, run `acopy setup` to register and install as a system service.
