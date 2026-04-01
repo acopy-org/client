@@ -93,6 +93,7 @@ jobs:
       - name: Install gomobile
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
+          go get golang.org/x/mobile/bind@latest
           gomobile init
       - name: Build AAR
         run: gomobile bind -target=android -androidapi 26 -o android/app/libs/golib.aar ./golib
