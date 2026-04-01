@@ -2,7 +2,6 @@ package clipboard
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,43 +24,33 @@ func ChangeCount() int64 {
 	return n
 }
 
-// readImageScript checks for image data on the pasteboard and returns
-// it as base64-encoded PNG. Returns empty string if no image is found.
-const readImageScript = `ObjC.import('AppKit');
-ObjC.import('Foundation');
-var pb = $.NSPasteboard.generalPasteboard;
-var types = ObjC.deepUnwrap(pb.types);
-var imageTypes = ['public.png', 'public.tiff', 'public.jpeg'];
-if (!imageTypes.some(function(t){ return types.indexOf(t) >= 0; })) {
-  '';
-} else {
-  var img = $.NSImage.alloc.initWithPasteboard(pb);
-  if (img.isNil()) {
-    '';
-  } else {
-    var tiff = img.TIFFRepresentation;
-    var bmp = $.NSBitmapImageRep.imageRepWithData(tiff);
-    var png = bmp.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $());
-    png.base64EncodedStringWithOptions(0).js;
-  }
-}`
-
 // Read returns clipboard content and its MIME type.
 // Images are returned as PNG bytes with "image/png".
 // Text is returned with "text/plain".
 func Read() ([]byte, string, error) {
-	out, err := exec.Command("osascript", "-l", "JavaScript", "-e", readImageScript).Output()
+	// Try reading image via AppleScript (handles PNG, TIFF, JPEG — macOS converts automatically)
+	f, err := os.CreateTemp("", "acopy-read-*.png")
 	if err == nil {
-		b64 := strings.TrimSpace(string(out))
-		if b64 != "" {
-			data, err := base64.StdEncoding.DecodeString(b64)
+		tmpPath := f.Name()
+		f.Close()
+		defer os.Remove(tmpPath)
+
+		script := fmt.Sprintf(
+			`set theImage to the clipboard as «class PNGf»
+set theFile to open for access POSIX file %q with write permission
+write theImage to theFile
+close access theFile`, tmpPath)
+
+		if err := exec.Command("osascript", "-e", script).Run(); err == nil {
+			data, err := os.ReadFile(tmpPath)
 			if err == nil && len(data) > 0 {
 				return data, "image/png", nil
 			}
 		}
 	}
 
-	out, err = exec.Command("pbpaste").Output()
+	// Fall back to text
+	out, err := exec.Command("pbpaste").Output()
 	if err != nil {
 		return nil, "", fmt.Errorf("pbpaste: %w", err)
 	}

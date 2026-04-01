@@ -78,13 +78,23 @@ Target: < 5 MB RSS, < 0.1% CPU when idle.
 
 Three goroutines run at steady state: the clipboard monitor (500ms ticker), the WebSocket reader (blocked on I/O), and a ping ticker (30s). The zstd encoder and decoder are allocated once and reused. Clipboard content over 10 MB is rejected.
 
+## Prerequisites
+
+**Linux:** `xclip` must be installed and a display server (X11) must be available. The systemd service sets `DISPLAY=:0` by default.
+
+```
+sudo apt install xclip      # Debian/Ubuntu
+sudo pacman -S xclip         # Arch
+sudo dnf install xclip       # Fedora
+```
+
 ## Platform Details
 
 | | macOS | Linux | Windows |
 |---|---|---|---|
-| Change detection | NSPasteboard.changeCount (cgo) | X11 XFixes events (cgo) | GetClipboardSequenceNumber (syscall) |
-| Clipboard read | pbpaste | xclip | Get-Clipboard |
-| Clipboard write | pbcopy | xclip | clip.exe |
+| Change detection | NSPasteboard.changeCount (osascript) | xclip TARGETS hash | GetClipboardSequenceNumber (syscall) |
+| Clipboard read | pbpaste / osascript (images) | xclip | Get-Clipboard |
+| Clipboard write | pbcopy / osascript (images) | xclip | clip.exe |
 | Service | launchd | systemd (user) | schtasks (logon) |
 | Binary location | /usr/local/bin | ~/.local/bin | %LOCALAPPDATA%\acopy |
 
