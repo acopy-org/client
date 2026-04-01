@@ -1,6 +1,11 @@
 package org.acopy.android
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -22,11 +27,24 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var config: ConfigStore
+    private lateinit var clipboardManager: ClipboardManager
+    private var lastPushedContent: String? = null
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
+
+    private val statusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val status = intent.getStringExtra(AcopyService.EXTRA_STATUS) ?: return
+            binding.tvStatus.text = status
+        }
+    }
+
+    private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
+        pushClipboardIfNew()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,27 +52,52 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         config = ConfigStore(this)
+        clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         requestNotificationPermission()
         updateUI()
 
         binding.btnLogin.setOnClickListener { authenticate("/api/users/login") }
         binding.btnRegister.setOnClickListener { authenticate("/api/users/register") }
 
-        binding.btnStart.setOnClickListener {
-            AcopyService.start(this)
-            updateUI()
-        }
-
-        binding.btnStop.setOnClickListener {
-            AcopyService.stop(this)
-            updateUI()
-        }
-
         binding.btnLogout.setOnClickListener {
-            AcopyService.stop(this)
             config.clear()
             updateUI()
+            // Service will stop itself when it sees no token
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ContextCompat.registerReceiver(
+            this, statusReceiver,
+            IntentFilter(AcopyService.ACTION_STATUS),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        clipboardManager.addPrimaryClipChangedListener(clipboardListener)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        unregisterReceiver(statusReceiver)
+        clipboardManager.removePrimaryClipChangedListener(clipboardListener)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && config.isLoggedIn) {
+            pushClipboardIfNew()
+        }
+    }
+
+    private fun pushClipboardIfNew() {
+        if (!config.isLoggedIn) return
+        val clip = clipboardManager.primaryClip ?: return
+        val text = clip.getItemAt(0)?.text?.toString() ?: return
+        if (text.isEmpty() || text == lastPushedContent) return
+        lastPushedContent = text
+        val content = text.toByteArray(Charsets.UTF_8)
+        if (content.size > 10 * 1024 * 1024) return
+        AcopyService.pushClipboard(this, content)
     }
 
     private fun updateUI() {
@@ -63,6 +106,7 @@ class MainActivity : AppCompatActivity() {
             binding.statusGroup.visibility = View.VISIBLE
             binding.tvDevice.text = config.deviceName
             binding.tvServer.text = config.serverUrl
+            AcopyService.start(this)
         } else {
             binding.authGroup.visibility = View.VISIBLE
             binding.statusGroup.visibility = View.GONE
@@ -123,7 +167,6 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     setLoading(false)
                     updateUI()
-                    AcopyService.start(this)
                 }
             } catch (e: Exception) {
                 runOnUiThread {

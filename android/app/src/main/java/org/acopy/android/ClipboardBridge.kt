@@ -12,6 +12,8 @@ class ClipboardBridge(
     private val clipboardManager =
         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     private var ignoreNextChange = false
+    @Volatile
+    var lastContent: String? = null
 
     override fun onPrimaryClipChanged() {
         if (ignoreNextChange) {
@@ -22,7 +24,9 @@ class ClipboardBridge(
         val clip = clipboardManager.primaryClip ?: return
         val text = clip.getItemAt(0)?.text?.toString() ?: return
         if (text.isEmpty()) return
+        if (text == lastContent) return
 
+        lastContent = text
         val content = text.toByteArray(Charsets.UTF_8)
         if (content.size > MAX_PAYLOAD_SIZE) return
 
@@ -30,8 +34,9 @@ class ClipboardBridge(
     }
 
     fun writeClipboard(content: ByteArray) {
-        ignoreNextChange = true
         val text = String(content, Charsets.UTF_8)
+        lastContent = text
+        ignoreNextChange = true
         val clip = ClipData.newPlainText("acopy", text)
         clipboardManager.setPrimaryClip(clip)
     }
