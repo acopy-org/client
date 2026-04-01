@@ -96,7 +96,9 @@ jobs:
           go get golang.org/x/mobile/bind@latest
           gomobile init
       - name: Build AAR
-        run: gomobile bind -target=android -androidapi 26 -o android/app/libs/golib.aar ./golib
+        run: |
+          mkdir -p android/app/libs
+          gomobile bind -target=android -androidapi 26 -o android/app/libs/golib.aar ./golib
       - name: Build APK
         working-directory: android
         run: |
