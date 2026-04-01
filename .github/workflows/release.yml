@@ -16,11 +16,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install X11 dev libraries
-        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxfixes-dev
       - name: Build
         env:
-          CGO_ENABLED: "1"
+          CGO_ENABLED: "0"
         run: go build -trimpath -ldflags="-s -w" -o acopy-linux-amd64 ./cmd/acopy
       - uses: actions/upload-artifact@v4
         with:
@@ -43,7 +41,7 @@ jobs:
           go-version-file: go.mod
       - name: Build
         env:
-          CGO_ENABLED: "1"
+          CGO_ENABLED: "0"
           GOOS: darwin
           GOARCH: ${{ matrix.goarch }}
         run: go build -trimpath -ldflags="-s -w" -o ${{ matrix.artifact }} ./cmd/acopy
