@@ -2,26 +2,67 @@ package clipboard
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
-	"strings"
+	"sync"
 )
 
-// ChangeCount returns the NSPasteboard change count, which increments
-// on every clipboard change (text, images, files, etc.).
+var (
+	lastHash [sha256.Size]byte
+	seqNo    int64
+	mu       sync.Mutex
+)
+
+// ChangeCount detects clipboard changes by hashing the clipboard content.
+// This works reliably from a LaunchAgent context (unlike JXA-based changeCount).
+// Returns a sequence number that increments on every clipboard change.
 func ChangeCount() int64 {
-	out, err := exec.Command("osascript", "-l", "JavaScript", "-e",
-		`ObjC.import('AppKit'); $.NSPasteboard.generalPasteboard.changeCount`).Output()
-	if err != nil {
-		return 0
+	mu.Lock()
+	defer mu.Unlock()
+
+	h := sha256.New()
+
+	// Hash clipboard types (text vs image)
+	types, _ := exec.Command("osascript", "-e", "clipboard info").Output()
+	h.Write(types)
+
+	// Hash actual content
+	if bytes.Contains(types, []byte("PNGf")) || bytes.Contains(types, []byte("TIFF")) || bytes.Contains(types, []byte("JPEG")) {
+		// Image data - try reading PNG from clipboard
+		f, err := os.CreateTemp("", "acopy-hash-*.png")
+		if err == nil {
+			tmpPath := f.Name()
+			f.Close()
+			defer os.Remove(tmpPath)
+
+			script := fmt.Sprintf(
+				`set theImage to the clipboard as «class PNGf»
+set theFile to open for access POSIX file %q with write permission
+write theImage to theFile
+close access theFile`, tmpPath)
+			if exec.Command("osascript", "-e", script).Run() == nil {
+				if data, err := os.ReadFile(tmpPath); err == nil {
+					h.Write(data)
+				}
+			}
+		}
+	} else {
+		// Text content
+		if text, err := exec.Command("pbpaste").Output(); err == nil {
+			h.Write(text)
+		}
 	}
-	n, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
-	if err != nil {
-		return 0
+
+	var sum [sha256.Size]byte
+	copy(sum[:], h.Sum(nil))
+
+	if sum != lastHash {
+		lastHash = sum
+		seqNo++
 	}
-	return n
+	return seqNo
 }
 
 // Read returns clipboard content and its MIME type.
