@@ -62,11 +62,13 @@ func (m *Monitor) Stop() {
 func (m *Monitor) poll() {
 	m.mu.Lock()
 	if m.pushing {
+		log.Printf("[POLL] skipped - still pushing")
 		m.mu.Unlock()
 		return
 	}
 
 	count := clipboard.ChangeCount()
+	log.Printf("[POLL] count=%d lastCount=%d", count, m.lastCount)
 	if count == m.lastCount {
 		m.mu.Unlock()
 		return
