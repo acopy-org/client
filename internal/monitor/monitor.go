@@ -24,6 +24,7 @@ type Monitor struct {
 	lastWasRemote bool
 	pushing       bool             // prevent concurrent pushes of same content
 	lastPushHash  [sha256.Size]byte // dedup repeated pushes of same content
+	lastPushTime  time.Time        // quiet period after push to let clipboard settle
 
 	done chan struct{}
 }
@@ -81,6 +82,13 @@ func (m *Monitor) poll() {
 		return
 	}
 
+	// Quiet period after push: let clipboard settle (macOS type population,
+	// OSC 52 round-trips via terminal emulator, etc.)
+	if !m.lastPushTime.IsZero() && time.Since(m.lastPushTime) < 2*time.Second {
+		m.mu.Unlock()
+		return
+	}
+
 	m.pushing = true
 	m.mu.Unlock()
 
@@ -133,6 +141,9 @@ func (m *Monitor) poll() {
 	})
 	m.mu.Lock()
 	m.pushing = false
+	if err == nil {
+		m.lastPushTime = time.Now()
+	}
 	m.mu.Unlock()
 	if err != nil {
 		log.Printf("push clipboard: %v", err)
