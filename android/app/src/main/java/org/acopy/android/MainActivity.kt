@@ -53,6 +53,7 @@ class MainActivity : AppCompatActivity() {
 
         config = ConfigStore(this)
         clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        clipboardManager.addPrimaryClipChangedListener(clipboardListener)
         requestNotificationPermission()
         updateUI()
 
@@ -62,7 +63,6 @@ class MainActivity : AppCompatActivity() {
         binding.btnLogout.setOnClickListener {
             config.clear()
             updateUI()
-            // Service will stop itself when it sees no token
         }
     }
 
@@ -73,16 +73,20 @@ class MainActivity : AppCompatActivity() {
             IntentFilter(AcopyService.ACTION_STATUS),
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
-        clipboardManager.addPrimaryClipChangedListener(clipboardListener)
         if (config.isLoggedIn) {
             binding.tvStatus.text = AcopyService.currentStatus
+            pushClipboardIfNew()
         }
     }
 
     override fun onPause() {
         super.onPause()
         unregisterReceiver(statusReceiver)
+    }
+
+    override fun onDestroy() {
         clipboardManager.removePrimaryClipChangedListener(clipboardListener)
+        super.onDestroy()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -94,13 +98,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun pushClipboardIfNew() {
         if (!config.isLoggedIn) return
-        val clip = clipboardManager.primaryClip ?: return
-        val text = clip.getItemAt(0)?.text?.toString() ?: return
-        if (text.isEmpty() || text == lastPushedContent) return
-        lastPushedContent = text
-        val content = text.toByteArray(Charsets.UTF_8)
-        if (content.size > 10 * 1024 * 1024) return
-        AcopyService.pushClipboard(this, content)
+        try {
+            val clip = clipboardManager.primaryClip ?: return
+            val text = clip.getItemAt(0)?.text?.toString() ?: return
+            if (text.isEmpty() || text == lastPushedContent) return
+            lastPushedContent = text
+            val content = text.toByteArray(Charsets.UTF_8)
+            if (content.size > 10 * 1024 * 1024) return
+            AcopyService.pushClipboard(this, content)
+        } catch (_: Exception) {
+            // Clipboard not accessible (Android 10+ background restriction)
+        }
     }
 
     private fun updateUI() {
