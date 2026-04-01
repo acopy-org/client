@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">acopy</string>
+    <string name="hint_email">Email</string>
+    <string name="hint_password">Password</string>
+    <string name="btn_login">Log in</string>
+    <string name="btn_register">Create account</string>
+    <string name="btn_start">Start sync</string>
+    <string name="btn_stop">Stop sync</string>
+    <string name="btn_logout">Log out</string>
+    <string name="label_device">Device</string>
+    <string name="label_server">Server</string>
+</resources>

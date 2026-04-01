@@ -33,7 +33,8 @@ type Client struct {
 	pendingMu sync.Mutex
 	pending   *protocol.ClipboardPushPayload
 
-	OnClipboard func(content []byte, device string)
+	OnClipboard       func(content []byte, device string)
+	OnConnectionState func(connected bool)
 
 	done chan struct{}
 }
@@ -97,6 +98,18 @@ func (c *Client) Stop() {
 	}
 	c.connMu.Unlock()
 	c.codec.Close()
+}
+
+// IsConnected returns whether the WebSocket connection is active.
+func (c *Client) IsConnected() bool {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return c.conn != nil
+}
+
+// ForceReconnect closes the current connection to trigger the reconnect loop.
+func (c *Client) ForceReconnect() {
+	c.closeConn()
 }
 
 // Send sends a message. If disconnected, clipboard pushes are queued
@@ -200,6 +213,9 @@ func (c *Client) connect() error {
 	}
 
 	log.Println("connected and authenticated")
+	if c.OnConnectionState != nil {
+		c.OnConnectionState(true)
+	}
 	go c.pingLoop(alive)
 
 	return nil
@@ -207,6 +223,7 @@ func (c *Client) connect() error {
 
 func (c *Client) closeConn() {
 	c.connMu.Lock()
+	wasConnected := c.conn != nil
 	if c.conn != nil {
 		c.conn.Close()
 		c.conn = nil
@@ -219,6 +236,9 @@ func (c *Client) closeConn() {
 		}
 	}
 	c.connMu.Unlock()
+	if wasConnected && c.OnConnectionState != nil {
+		c.OnConnectionState(false)
+	}
 }
 
 func (c *Client) flushPending() {
