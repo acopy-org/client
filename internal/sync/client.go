@@ -152,7 +152,6 @@ func (c *Client) sendFrame(msgType protocol.MsgType, payload any) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("sendFrame: msgType=%d frameSize=%d", msgType, len(frame))
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
 	if c.conn == nil {
