@@ -160,6 +160,13 @@ func (m *Monitor) onRemoteClipboard(content []byte, device string, contentType s
 	m.mu.Lock()
 	m.lastWasRemote = true
 	m.lastCount = clipboard.ChangeCount()
+	// Mark the written content as "already pushed" so we don't echo it back.
+	// For images with a URL, the clipboard gets the URL text, not the raw image.
+	if clipURL != "" {
+		m.lastPushHash = sha256.Sum256([]byte(clipURL))
+	} else {
+		m.lastPushHash = sha256.Sum256(content)
+	}
 	m.mu.Unlock()
 
 	log.Printf("clipboard updated from %s", device)
