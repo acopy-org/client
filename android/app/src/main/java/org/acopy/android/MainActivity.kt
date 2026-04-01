@@ -74,6 +74,9 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
         clipboardManager.addPrimaryClipChangedListener(clipboardListener)
+        if (config.isLoggedIn) {
+            binding.tvStatus.text = AcopyService.currentStatus
+        }
     }
 
     override fun onPause() {

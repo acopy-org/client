@@ -42,7 +42,8 @@ class AcopyService : Service() {
             return START_NOT_STICKY
         }
 
-        sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName).putExtra(EXTRA_STATUS, "Connecting..."))
+        currentStatus = "Connecting..."
+        sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName).putExtra(EXTRA_STATUS, currentStatus))
 
         ServiceCompat.startForeground(
             this,
@@ -69,6 +70,7 @@ class AcopyService : Service() {
             },
             onConnectionState = { connected ->
                 val text = if (connected) "Connected" else "Reconnecting..."
+                currentStatus = text
                 updateNotification(text)
                 sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName).putExtra(EXTRA_STATUS, text))
                 Log.d(TAG, "Connection state: $text")
@@ -93,7 +95,8 @@ class AcopyService : Service() {
         clipboardBridge?.unregister()
         syncClient?.stop()
         syncClient = null
-        sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName).putExtra(EXTRA_STATUS, "Stopped"))
+        currentStatus = "Stopped"
+        sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName).putExtra(EXTRA_STATUS, currentStatus))
         super.onDestroy()
     }
 
@@ -142,6 +145,10 @@ class AcopyService : Service() {
         const val ACTION_PUSH_CLIPBOARD = "org.acopy.android.PUSH_CLIPBOARD"
         const val EXTRA_STATUS = "status"
         const val EXTRA_CLIPBOARD = "clipboard"
+
+        @Volatile
+        var currentStatus: String = "Stopped"
+            private set
 
         fun start(context: Context) {
             val intent = Intent(context, AcopyService::class.java)
