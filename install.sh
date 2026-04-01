@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-BASE_URL="https://acopy.org"
+BASE_URL="https://github.com/acopy-org/client/releases/latest/download"
 INSTALL_DIR="/usr/local/bin"
 BIN="acopy"
 
