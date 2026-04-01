@@ -7,7 +7,7 @@ Shared clipboard across machines.
 **macOS / Linux:**
 
 ```bash
-curl -fsSL https://acopy.org/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/acopy-org/client/main/install.sh | sh
 ```
 
 The binary will be installed to:
@@ -17,7 +17,7 @@ The binary will be installed to:
 **Windows (PowerShell):**
 
 ```powershell
-irm https://acopy.org/install.ps1 | iex
+irm https://raw.githubusercontent.com/acopy-org/client/main/install.ps1 | iex
 ```
 
 The binary will be installed to `%LOCALAPPDATA%\acopy\`
