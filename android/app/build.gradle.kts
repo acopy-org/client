@@ -11,8 +11,8 @@ android {
         applicationId = "org.acopy.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0.10"
+        versionCode = 14
+        versionName = "1.0.14"
     }
 
     signingConfigs {

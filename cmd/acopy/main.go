@@ -69,7 +69,7 @@ func cmdStart() {
 		log.Fatalf("init client: %v", err)
 	}
 
-	mon := monitor.New(client, cfg.DeviceName)
+	mon := monitor.New(client, cfg.DeviceName, cfg.ServerURL)
 
 	// Handle shutdown
 	sig := make(chan os.Signal, 1)

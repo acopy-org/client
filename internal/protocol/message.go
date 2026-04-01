@@ -39,14 +39,17 @@ type AuthPayload struct {
 }
 
 type ClipboardPushPayload struct {
-	Content []byte `msgpack:"content"`
-	Device  string `msgpack:"device"`
+	Content     []byte `msgpack:"content"`
+	Device      string `msgpack:"device"`
+	ContentType string `msgpack:"content_type"`
 }
 
 type ClipboardBroadcastPayload struct {
-	Content []byte `msgpack:"content"`
-	Device  string `msgpack:"device"`
-	TS      int64  `msgpack:"ts"`
+	ID          string `msgpack:"id"`
+	Content     []byte `msgpack:"content"`
+	Device      string `msgpack:"device"`
+	ContentType string `msgpack:"content_type"`
+	TS          int64  `msgpack:"ts"`
 }
 
 type AckPayload struct {

@@ -30,9 +30,14 @@ class AcopyService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_PUSH_CLIPBOARD) {
             val content = intent.getByteArrayExtra(EXTRA_CLIPBOARD) ?: return START_STICKY
+            val contentType = intent.getStringExtra(EXTRA_CONTENT_TYPE) ?: "text/plain"
             val config = ConfigStore(this)
-            clipboardBridge?.lastContent = String(content, Charsets.UTF_8)
-            syncClient?.pushClipboard(content, config.deviceName)
+            clipboardBridge?.lastContentHash = if (contentType == "text/plain") {
+                String(content, Charsets.UTF_8).hashCode()
+            } else {
+                content.contentHashCode()
+            }
+            syncClient?.pushClipboard(content, config.deviceName, contentType)
             return START_STICKY
         }
 
@@ -52,8 +57,8 @@ class AcopyService : Service() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         )
 
-        val cb = ClipboardBridge(this) { content ->
-            syncClient?.pushClipboard(content, config.deviceName)
+        val cb = ClipboardBridge(this) { content, contentType ->
+            syncClient?.pushClipboard(content, config.deviceName, contentType)
         }
         cb.register()
         clipboardBridge = cb
@@ -62,9 +67,9 @@ class AcopyService : Service() {
             serverUrl = config.serverUrl,
             token = config.token,
             deviceName = config.deviceName,
-            onClipboard = { content, device ->
+            onClipboard = { content, device, contentType ->
                 mainHandler.post {
-                    clipboardBridge?.writeClipboard(content)
+                    clipboardBridge?.writeClipboard(content, contentType)
                 }
                 Log.d(TAG, "Clipboard updated from $device")
             },
@@ -145,6 +150,7 @@ class AcopyService : Service() {
         const val ACTION_PUSH_CLIPBOARD = "org.acopy.android.PUSH_CLIPBOARD"
         const val EXTRA_STATUS = "status"
         const val EXTRA_CLIPBOARD = "clipboard"
+        const val EXTRA_CONTENT_TYPE = "content_type"
 
         @Volatile
         var currentStatus: String = "Stopped"
@@ -155,10 +161,11 @@ class AcopyService : Service() {
             context.startForegroundService(intent)
         }
 
-        fun pushClipboard(context: Context, content: ByteArray) {
+        fun pushClipboard(context: Context, content: ByteArray, contentType: String = "text/plain") {
             val intent = Intent(context, AcopyService::class.java).apply {
                 action = ACTION_PUSH_CLIPBOARD
                 putExtra(EXTRA_CLIPBOARD, content)
+                putExtra(EXTRA_CONTENT_TYPE, contentType)
             }
             context.startService(intent)
         }

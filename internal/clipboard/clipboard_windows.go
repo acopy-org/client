@@ -20,15 +20,18 @@ func ChangeCount() int64 {
 	return int64(ret)
 }
 
-func Read() ([]byte, error) {
+func Read() ([]byte, string, error) {
 	out, err := exec.Command("powershell", "-NoProfile", "-Command", "Get-Clipboard -Raw").Output()
 	if err != nil {
-		return nil, fmt.Errorf("Get-Clipboard: %w", err)
+		return nil, "", fmt.Errorf("Get-Clipboard: %w", err)
 	}
-	return out, nil
+	return out, "text/plain", nil
 }
 
-func Write(data []byte) error {
+func Write(data []byte, contentType string, clipURL string) error {
+	if contentType == "image/png" && clipURL != "" {
+		data = []byte(clipURL)
+	}
 	cmd := exec.Command("clip.exe")
 	cmd.Stdin = bytes.NewReader(data)
 	if err := cmd.Run(); err != nil {

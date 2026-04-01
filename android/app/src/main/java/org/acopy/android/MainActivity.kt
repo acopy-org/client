@@ -28,7 +28,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var config: ConfigStore
     private lateinit var clipboardManager: ClipboardManager
-    private var lastPushedContent: String? = null
+    private var lastPushedHash: Int? = null
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -100,12 +100,35 @@ class MainActivity : AppCompatActivity() {
         if (!config.isLoggedIn) return
         try {
             val clip = clipboardManager.primaryClip ?: return
-            val text = clip.getItemAt(0)?.text?.toString() ?: return
-            if (text.isEmpty() || text == lastPushedContent) return
-            lastPushedContent = text
-            val content = text.toByteArray(Charsets.UTF_8)
-            if (content.size > 10 * 1024 * 1024) return
-            AcopyService.pushClipboard(this, content)
+            val item = clip.getItemAt(0) ?: return
+
+            // Try text first
+            val text = item.text?.toString()
+            if (text != null && text.isNotEmpty()) {
+                val hash = text.hashCode()
+                if (hash == lastPushedHash) return
+                lastPushedHash = hash
+                val content = text.toByteArray(Charsets.UTF_8)
+                if (content.size > 10 * 1024 * 1024) return
+                AcopyService.pushClipboard(this, content, "text/plain")
+                return
+            }
+
+            // Try URI (images)
+            val uri = item.uri ?: return
+            val mimeType = clip.description?.getMimeType(0) ?: return
+            if (!mimeType.startsWith("image/")) return
+            var bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+            val hash = bytes.contentHashCode()
+            if (hash == lastPushedHash) return
+            lastPushedHash = hash
+            var actualMime = mimeType
+            if (bytes.size > ClipboardBridge.MAX_PAYLOAD_SIZE) {
+                bytes = ClipboardBridge.compressToJpeg(bytes) ?: return
+                actualMime = "image/jpeg"
+                if (bytes.size > ClipboardBridge.MAX_PAYLOAD_SIZE) return
+            }
+            AcopyService.pushClipboard(this, bytes, actualMime)
         } catch (_: Exception) {
             // Clipboard not accessible (Android 10+ background restriction)
         }

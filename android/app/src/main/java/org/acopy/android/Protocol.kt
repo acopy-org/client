@@ -28,8 +28,8 @@ enum class MsgType(val value: Byte) {
 }
 
 data class AuthPayload(val token: String)
-data class ClipboardPushPayload(val content: ByteArray, val device: String)
-data class ClipboardBroadcastPayload(val content: ByteArray, val device: String, val ts: Long)
+data class ClipboardPushPayload(val content: ByteArray, val device: String, val contentType: String = "text/plain")
+data class ClipboardBroadcastPayload(val id: String = "", val content: ByteArray, val device: String, val contentType: String = "text/plain", val ts: Long = 0)
 data class ErrorPayload(val code: Int, val msg: String)
 
 object Codec {
@@ -90,15 +90,17 @@ object Codec {
         return out.toByteArray()
     }
 
-    fun encodeClipboardPush(content: ByteArray, device: String): ByteArray {
+    fun encodeClipboardPush(content: ByteArray, device: String, contentType: String = "text/plain"): ByteArray {
         val out = ByteArrayOutputStream()
         MessagePack.newDefaultPacker(out).use { packer ->
-            packer.packMapHeader(2)
+            packer.packMapHeader(3)
             packer.packString("content")
             packer.packBinaryHeader(content.size)
             packer.writePayload(content)
             packer.packString("device")
             packer.packString(device)
+            packer.packString("content_type")
+            packer.packString(contentType)
         }
         return out.toByteArray()
     }
@@ -108,24 +110,28 @@ object Codec {
     // --- msgpack decoding helpers ---
 
     fun decodeClipboardBroadcast(raw: ByteArray): ClipboardBroadcastPayload {
+        var id = ""
         var content = ByteArray(0)
         var device = ""
+        var contentType = "text/plain"
         var ts = 0L
         MessagePack.newDefaultUnpacker(raw).use { unpacker ->
             val mapSize = unpacker.unpackMapHeader()
             repeat(mapSize) {
                 when (unpacker.unpackString()) {
+                    "id" -> id = unpacker.unpackString()
                     "content" -> {
                         val len = unpacker.unpackBinaryHeader()
                         content = unpacker.readPayload(len)
                     }
                     "device" -> device = unpacker.unpackString()
+                    "content_type" -> contentType = unpacker.unpackString()
                     "ts" -> ts = unpacker.unpackLong()
                     else -> unpacker.skipValue()
                 }
             }
         }
-        return ClipboardBroadcastPayload(content, device, ts)
+        return ClipboardBroadcastPayload(id, content, device, contentType, ts)
     }
 
     fun decodeError(raw: ByteArray): ErrorPayload {

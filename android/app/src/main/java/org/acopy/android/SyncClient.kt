@@ -16,7 +16,7 @@ class SyncClient(
     private val serverUrl: String,
     private val token: String,
     private val deviceName: String,
-    private val onClipboard: (content: ByteArray, device: String) -> Unit,
+    private val onClipboard: (content: ByteArray, device: String, contentType: String) -> Unit,
     private val onConnectionState: (connected: Boolean) -> Unit,
     private val onError: (msg: String) -> Unit
 ) {
@@ -45,18 +45,18 @@ class SyncClient(
         client.dispatcher.executorService.shutdown()
     }
 
-    fun pushClipboard(content: ByteArray, device: String) {
+    fun pushClipboard(content: ByteArray, device: String, contentType: String = "text/plain") {
         val socket = ws.get()
         if (socket == null || !connected.get()) {
-            pendingClipboard.set(ClipboardPushPayload(content, device))
+            pendingClipboard.set(ClipboardPushPayload(content, device, contentType))
             Log.d(TAG, "offline — queued clipboard for sync on reconnect")
             return
         }
 
-        val payload = Codec.encodeClipboardPush(content, device)
+        val payload = Codec.encodeClipboardPush(content, device, contentType)
         val frame = Codec.encode(MsgType.CLIPBOARD_PUSH, payload)
         if (!socket.send(frame.toByteString())) {
-            pendingClipboard.set(ClipboardPushPayload(content, device))
+            pendingClipboard.set(ClipboardPushPayload(content, device, contentType))
             Log.d(TAG, "send failed — queued clipboard for sync on reconnect")
         }
     }
@@ -127,7 +127,7 @@ class SyncClient(
             }
             MsgType.CLIPBOARD_BROADCAST -> {
                 val payload = Codec.decodeClipboardBroadcast(raw)
-                onClipboard(payload.content, payload.device)
+                onClipboard(payload.content, payload.device, payload.contentType)
             }
             MsgType.ERROR -> {
                 val payload = Codec.decodeError(raw)
@@ -149,7 +149,7 @@ class SyncClient(
     private fun flushPending() {
         val p = pendingClipboard.getAndSet(null) ?: return
         Log.d(TAG, "flushing queued clipboard")
-        pushClipboard(p.content, p.device)
+        pushClipboard(p.content, p.device, p.contentType)
     }
 
     private fun onDisconnected() {

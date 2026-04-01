@@ -33,7 +33,7 @@ type Client struct {
 	pendingMu sync.Mutex
 	pending   *protocol.ClipboardPushPayload
 
-	OnClipboard       func(content []byte, device string)
+	OnClipboard       func(content []byte, device string, contentType string, id string)
 	OnConnectionState func(connected bool)
 
 	done chan struct{}
@@ -283,7 +283,11 @@ func (c *Client) readLoop() error {
 				continue
 			}
 			if c.OnClipboard != nil {
-				c.OnClipboard(p.Content, p.Device)
+				contentType := p.ContentType
+				if contentType == "" {
+					contentType = "text/plain"
+				}
+				c.OnClipboard(p.Content, p.Device, contentType, p.ID)
 			}
 
 		case protocol.MsgAck:

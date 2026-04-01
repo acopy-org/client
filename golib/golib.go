@@ -31,7 +31,7 @@ func NewBridge(serverURL, token, deviceName string, cb Callback) (*Bridge, error
 
 	b := &Bridge{client: client, cb: cb}
 
-	client.OnClipboard = func(content []byte, device string) {
+	client.OnClipboard = func(content []byte, device string, contentType string, id string) {
 		cb.OnClipboardReceived(content, device)
 	}
 	client.OnConnectionState = func(connected bool) {
@@ -54,8 +54,9 @@ func (b *Bridge) Stop() {
 // PushClipboard sends clipboard content to the server for broadcast.
 func (b *Bridge) PushClipboard(content []byte, device string) {
 	err := b.client.Send(protocol.MsgClipboardPush, &protocol.ClipboardPushPayload{
-		Content: content,
-		Device:  device,
+		Content:     content,
+		Device:      device,
+		ContentType: "text/plain",
 	})
 	if err != nil {
 		log.Printf("push clipboard: %v", err)

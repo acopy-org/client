@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,8 +14,9 @@ import (
 const pollInterval = 500 * time.Millisecond
 
 type Monitor struct {
-	client *acSync.Client
-	device string
+	client    *acSync.Client
+	device    string
+	serverURL string
 
 	mu            sync.Mutex
 	lastCount     int64
@@ -23,11 +25,12 @@ type Monitor struct {
 	done chan struct{}
 }
 
-func New(client *acSync.Client, device string) *Monitor {
+func New(client *acSync.Client, device string, serverURL string) *Monitor {
 	m := &Monitor{
-		client: client,
-		device: device,
-		done:   make(chan struct{}),
+		client:    client,
+		device:    device,
+		serverURL: serverURL,
+		done:      make(chan struct{}),
 	}
 	client.OnClipboard = m.onRemoteClipboard
 	return m
@@ -72,7 +75,7 @@ func (m *Monitor) poll() {
 	}
 	m.mu.Unlock()
 
-	content, err := clipboard.Read()
+	content, contentType, err := clipboard.Read()
 	if err != nil {
 		log.Printf("clipboard read: %v", err)
 		return
@@ -88,18 +91,24 @@ func (m *Monitor) poll() {
 	}
 
 	err = m.client.Send(protocol.MsgClipboardPush, &protocol.ClipboardPushPayload{
-		Content: content,
-		Device:  m.device,
+		Content:     content,
+		Device:      m.device,
+		ContentType: contentType,
 	})
 	if err != nil {
 		log.Printf("push clipboard: %v", err)
 	} else {
-		log.Printf("pushed clipboard (%d bytes)", len(content))
+		log.Printf("pushed clipboard (%d bytes, %s)", len(content), contentType)
 	}
 }
 
-func (m *Monitor) onRemoteClipboard(content []byte, device string) {
-	if err := clipboard.Write(content); err != nil {
+func (m *Monitor) onRemoteClipboard(content []byte, device string, contentType string, id string) {
+	var clipURL string
+	if strings.HasPrefix(contentType, "image/") && id != "" {
+		clipURL = strings.TrimRight(m.serverURL, "/") + "/c/" + id
+	}
+
+	if err := clipboard.Write(content, contentType, clipURL); err != nil {
 		log.Printf("clipboard write: %v", err)
 		return
 	}
