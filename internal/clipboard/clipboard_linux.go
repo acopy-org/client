@@ -8,15 +8,53 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
 
 var (
-	lastHash [sha256.Size]byte
-	seqNo    int64
-	mu       sync.Mutex
+	lastHash     [sha256.Size]byte
+	seqNo        int64
+	mu           sync.Mutex
+	xclipChecked bool
+	xclipFound   bool
 )
+
+func hasXclip() bool {
+	if !xclipChecked {
+		xclipChecked = true
+		_, err := exec.LookPath("xclip")
+		xclipFound = err == nil
+		if !xclipFound {
+			log.Printf("xclip not found — clipboard sync will save to ~/.cache/acopy/")
+			log.Printf("install xclip for full clipboard support: %s", installHint())
+		}
+	}
+	return xclipFound
+}
+
+func installHint() string {
+	if _, err := exec.LookPath("apt-get"); err == nil {
+		return "sudo apt-get install -y xclip"
+	}
+	if _, err := exec.LookPath("dnf"); err == nil {
+		return "sudo dnf install -y xclip"
+	}
+	if _, err := exec.LookPath("yum"); err == nil {
+		return "sudo yum install -y xclip"
+	}
+	if _, err := exec.LookPath("pacman"); err == nil {
+		return "sudo pacman -S xclip"
+	}
+	if _, err := exec.LookPath("zypper"); err == nil {
+		return "sudo zypper install xclip"
+	}
+	if _, err := exec.LookPath("apk"); err == nil {
+		return "sudo apk add xclip"
+	}
+	return "install xclip using your package manager"
+}
 
 // ChangeCount detects clipboard changes by hashing the available
 // TARGETS plus content. This catches both text and image changes.
@@ -51,8 +89,6 @@ func ChangeCount() int64 {
 }
 
 // Read returns clipboard content and its MIME type.
-// If the clipboard has image/png data, it returns that with "image/png".
-// Otherwise it returns text with "text/plain".
 func Read() ([]byte, string, error) {
 	targets, _ := exec.Command("xclip", "-selection", "clipboard", "-o", "-t", "TARGETS").Output()
 
@@ -73,6 +109,12 @@ func Read() ([]byte, string, error) {
 // Write sets the clipboard content. If xclip is available, uses it.
 // Otherwise saves to ~/.cache/acopy/ as a fallback for headless SSH.
 func Write(data []byte, contentType string, clipURL string) error {
+	// For images with a URL, write the URL as text so Ctrl+V pastes it
+	if strings.HasPrefix(contentType, "image/") && clipURL != "" {
+		data = []byte(clipURL)
+		contentType = "text/plain"
+	}
+
 	if hasXclip() {
 		args := []string{"-selection", "clipboard"}
 		if contentType == "image/png" {
@@ -87,11 +129,6 @@ func Write(data []byte, contentType string, clipURL string) error {
 	}
 
 	return saveToCache(data, contentType)
-}
-
-func hasXclip() bool {
-	_, err := exec.LookPath("xclip")
-	return err == nil
 }
 
 func saveToCache(data []byte, contentType string) error {
@@ -113,10 +150,17 @@ func saveToCache(data []byte, contentType string) error {
 	}
 
 	ts := time.Now().Format("20060102-150405")
-	path := filepath.Join(dir, fmt.Sprintf("clip-%s.%s", ts, ext))
+	name := fmt.Sprintf("clip-%s.%s", ts, ext)
+	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("write cache: %w", err)
 	}
+
+	// Update latest symlink
+	latest := filepath.Join(dir, "latest."+ext)
+	os.Remove(latest)
+	os.Symlink(name, latest)
+
 	log.Printf("saved clipboard to %s", path)
 	return nil
 }
