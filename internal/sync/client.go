@@ -133,6 +133,9 @@ func (c *Client) Send(msgType protocol.MsgType, payload any) error {
 	}
 
 	err := c.sendFrame(msgType, payload)
+	if err != nil {
+		log.Printf("sendFrame error: %v", err)
+	}
 	if err != nil && msgType == protocol.MsgClipboardPush {
 		if p, ok := payload.(*protocol.ClipboardPushPayload); ok {
 			c.pendingMu.Lock()
@@ -149,11 +152,13 @@ func (c *Client) sendFrame(msgType protocol.MsgType, payload any) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("sendFrame: msgType=%d frameSize=%d", msgType, len(frame))
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
 	if c.conn == nil {
 		return fmt.Errorf("not connected")
 	}
+	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	return c.conn.WriteMessage(websocket.BinaryMessage, frame)
 }
 
@@ -170,7 +175,11 @@ func (c *Client) connect() error {
 	}
 	u.Path = "/ws"
 
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	dialer := websocket.Dialer{
+		ReadBufferSize:  1024 * 64, // 64KB read buffer
+		WriteBufferSize: 1024 * 64, // 64KB write buffer
+	}
+	conn, _, err := dialer.Dial(u.String(), nil)
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}

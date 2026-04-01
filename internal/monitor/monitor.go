@@ -21,6 +21,7 @@ type Monitor struct {
 	mu            sync.Mutex
 	lastCount     int64
 	lastWasRemote bool
+	pushing       bool // prevent concurrent pushes of same content
 
 	done chan struct{}
 }
@@ -59,9 +60,13 @@ func (m *Monitor) Stop() {
 }
 
 func (m *Monitor) poll() {
-	count := clipboard.ChangeCount()
-
 	m.mu.Lock()
+	if m.pushing {
+		m.mu.Unlock()
+		return
+	}
+
+	count := clipboard.ChangeCount()
 	if count == m.lastCount {
 		m.mu.Unlock()
 		return
@@ -73,6 +78,8 @@ func (m *Monitor) poll() {
 		m.mu.Unlock()
 		return
 	}
+
+	m.pushing = true
 	m.mu.Unlock()
 
 	content, contentType, err := clipboard.Read()
@@ -95,6 +102,9 @@ func (m *Monitor) poll() {
 		Device:      m.device,
 		ContentType: contentType,
 	})
+	m.mu.Lock()
+	m.pushing = false
+	m.mu.Unlock()
 	if err != nil {
 		log.Printf("push clipboard: %v", err)
 	} else {
