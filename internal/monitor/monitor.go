@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"crypto/sha256"
 	"log"
 	"strings"
 	"sync"
@@ -21,7 +22,8 @@ type Monitor struct {
 	mu            sync.Mutex
 	lastCount     int64
 	lastWasRemote bool
-	pushing       bool // prevent concurrent pushes of same content
+	pushing       bool             // prevent concurrent pushes of same content
+	lastPushHash  [sha256.Size]byte // dedup repeated pushes of same content
 
 	done chan struct{}
 }
@@ -92,17 +94,37 @@ func (m *Monitor) poll() {
 
 	if err != nil {
 		log.Printf("clipboard read: %v", err)
+		m.mu.Lock()
+		m.pushing = false
+		m.mu.Unlock()
 		return
 	}
 
 	if len(content) == 0 {
+		m.mu.Lock()
+		m.pushing = false
+		m.mu.Unlock()
 		return
 	}
 
 	if len(content) > protocol.MaxPayloadSize {
 		log.Printf("clipboard content too large (%d bytes), skipping", len(content))
+		m.mu.Lock()
+		m.pushing = false
+		m.mu.Unlock()
 		return
 	}
+
+	// Deduplicate: skip if content is identical to last push
+	hash := sha256.Sum256(content)
+	m.mu.Lock()
+	if hash == m.lastPushHash {
+		m.pushing = false
+		m.mu.Unlock()
+		return
+	}
+	m.lastPushHash = hash
+	m.mu.Unlock()
 
 	err = m.client.Send(protocol.MsgClipboardPush, &protocol.ClipboardPushPayload{
 		Content:     content,
