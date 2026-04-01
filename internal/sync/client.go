@@ -158,7 +158,11 @@ func (c *Client) sendFrame(msgType protocol.MsgType, payload any) error {
 		return fmt.Errorf("not connected")
 	}
 	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	return c.conn.WriteMessage(websocket.BinaryMessage, frame)
+	err = c.conn.WriteMessage(websocket.BinaryMessage, frame)
+	if msgType == protocol.MsgClipboardPush {
+		log.Printf("ws write: %d bytes, err=%v", len(frame), err)
+	}
+	return err
 }
 
 func (c *Client) connect() error {
@@ -299,7 +303,7 @@ func (c *Client) readLoop() error {
 			}
 
 		case protocol.MsgAck:
-			// success
+			log.Printf("server ack received")
 
 		case protocol.MsgError:
 			p, err := protocol.DecodePayload[protocol.ErrorPayload](raw)
