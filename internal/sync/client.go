@@ -1,8 +1,11 @@
 package sync
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"sync"
 	"time"
@@ -10,6 +13,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/riz/acopy-client/internal/protocol"
 )
+
+const httpPushThreshold = 60 * 1024 // 60KB — use HTTP POST for payloads above this
 
 const (
 	pingInterval   = 30 * time.Second
@@ -114,7 +119,17 @@ func (c *Client) ForceReconnect() {
 
 // Send sends a message. If disconnected, clipboard pushes are queued
 // (only latest kept) and flushed on reconnect. Other messages are dropped.
+// Large clipboard pushes (>60KB) use HTTP POST to bypass WebSocket frame size limits.
 func (c *Client) Send(msgType protocol.MsgType, payload any) error {
+	// Route large clipboard pushes via HTTP
+	if msgType == protocol.MsgClipboardPush {
+		if p, ok := payload.(*protocol.ClipboardPushPayload); ok {
+			if len(p.Content) > httpPushThreshold {
+				return c.httpPush(p)
+			}
+		}
+	}
+
 	c.connMu.Lock()
 	connected := c.conn != nil
 	c.connMu.Unlock()
@@ -145,6 +160,33 @@ func (c *Client) Send(msgType protocol.MsgType, payload any) error {
 		}
 	}
 	return err
+}
+
+// httpPush sends a clipboard push via HTTP POST for large payloads
+// that exceed the WebSocket frame size limit.
+func (c *Client) httpPush(p *protocol.ClipboardPushPayload) error {
+	pushURL := c.serverURL + "/api/clipboard/push"
+	req, err := http.NewRequest("POST", pushURL, bytes.NewReader(p.Content))
+	if err != nil {
+		return fmt.Errorf("http push: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("X-Acopy-Device", p.Device)
+	req.Header.Set("X-Acopy-Content-Type", p.ContentType)
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("http push: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != 201 {
+		return fmt.Errorf("http push: status %d: %s", resp.StatusCode, body)
+	}
+	log.Printf("http push: %d bytes, status %d", len(p.Content), resp.StatusCode)
+	return nil
 }
 
 func (c *Client) sendFrame(msgType protocol.MsgType, payload any) error {
