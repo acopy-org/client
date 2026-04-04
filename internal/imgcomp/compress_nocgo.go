@@ -1,4 +1,4 @@
-//go:build !vips
+//go:build !cgo
 
 package imgcomp
 
@@ -44,28 +44,4 @@ func CompressImage(imgData []byte) ([]byte, string, error) {
 		return nil, "", err
 	}
 	return buf.Bytes(), "image/jpeg", nil
-}
-
-func downscale(img image.Image, maxDim int) image.Image {
-	b := img.Bounds()
-	w, h := b.Dx(), b.Dy()
-	if w <= maxDim && h <= maxDim {
-		return img
-	}
-	scale := float64(maxDim) / float64(w)
-	if h > w {
-		scale = float64(maxDim) / float64(h)
-	}
-	newW := int(float64(w) * scale)
-	newH := int(float64(h) * scale)
-
-	dst := image.NewRGBA(image.Rect(0, 0, newW, newH))
-	for y := 0; y < newH; y++ {
-		srcY := b.Min.Y + y*h/newH
-		for x := 0; x < newW; x++ {
-			srcX := b.Min.X + x*w/newW
-			dst.Set(x, y, img.At(srcX, srcY))
-		}
-	}
-	return dst
 }
