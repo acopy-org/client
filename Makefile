@@ -1,8 +1,9 @@
 .PHONY: build android android-aar android-apk clean
 
 # Desktop binary
+VERSION ?= dev
 build:
-	go build -o acopy ./cmd/acopy
+	go build -ldflags="-X main.Version=$(VERSION)" -o acopy ./cmd/acopy
 
 # Android: build AAR from Go, then build APK
 android: android-aar android-apk
