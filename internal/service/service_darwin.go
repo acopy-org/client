@@ -103,6 +103,14 @@ func Setup(binPath string) error {
 	return nil
 }
 
+func Stop() error {
+	path := plistPath()
+	if err := exec.Command("launchctl", "unload", path).Run(); err != nil {
+		return fmt.Errorf("stop service: %w", err)
+	}
+	return nil
+}
+
 func Remove() error {
 	path := plistPath()
 	_ = exec.Command("launchctl", "unload", path).Run()

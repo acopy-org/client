@@ -78,6 +78,13 @@ func Setup(binPath string) error {
 	return nil
 }
 
+func Stop() error {
+	if err := exec.Command("systemctl", "--user", "stop", unitName).Run(); err != nil {
+		return fmt.Errorf("stop service: %w", err)
+	}
+	return nil
+}
+
 func Remove() error {
 	_ = exec.Command("systemctl", "--user", "disable", "--now", unitName).Run()
 	if err := os.Remove(unitPath()); err != nil && !os.IsNotExist(err) {

@@ -57,6 +57,13 @@ func Setup(binPath string) error {
 	return nil
 }
 
+func Stop() error {
+	if err := exec.Command("schtasks", "/End", "/TN", taskName).Run(); err != nil {
+		return fmt.Errorf("stop service: %w", err)
+	}
+	return nil
+}
+
 func Remove() error {
 	if err := exec.Command("schtasks", "/Delete", "/TN", taskName, "/F").Run(); err != nil {
 		return fmt.Errorf("schtasks delete: %w", err)

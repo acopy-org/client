@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 
+	"golang.org/x/term"
+
 	"github.com/riz/acopy-client/internal/auth"
 	"github.com/riz/acopy-client/internal/config"
 	"github.com/riz/acopy-client/internal/monitor"
@@ -33,6 +35,8 @@ func main() {
 		cmdStart()
 	case "setup":
 		cmdSetup()
+	case "stop":
+		cmdStop()
 	case "remove":
 		cmdRemove()
 	case "status":
@@ -51,6 +55,7 @@ func usage() {
 
 commands:
   setup       Register/login + install as system service
+  stop        Stop the service
   remove      Remove system service
   status      Show config and service status
   start       Start clipboard sync (foreground)
@@ -64,7 +69,12 @@ func cmdStart() {
 	}
 	cfg.ServerURL = "https://acopy.org"
 	if cfg.Token == "" {
-		log.Fatal("not configured, run 'acopy setup' first")
+		fmt.Println("not configured, running setup...")
+		cmdSetup()
+		cfg, err = config.Load()
+		if err != nil {
+			log.Fatalf("load config: %v", err)
+		}
 	}
 	if cfg.DeviceName == "" {
 		cfg.DeviceName, _ = os.Hostname()
@@ -142,6 +152,13 @@ func cmdSetup() {
 	fmt.Println("service installed and started")
 }
 
+func cmdStop() {
+	if err := service.Stop(); err != nil {
+		log.Fatalf("stop: %v", err)
+	}
+	fmt.Println("service stopped")
+}
+
 func cmdRemove() {
 	if err := service.Remove(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -184,8 +201,10 @@ func prompt(label string) string {
 
 func promptPassword(label string) string {
 	fmt.Printf("%s: ", label)
-	// Simple stdin read — no echo suppression for now
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Scan()
-	return strings.TrimSpace(scanner.Text())
+	b, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Println()
+	if err != nil {
+		log.Fatalf("read password: %v", err)
+	}
+	return strings.TrimSpace(string(b))
 }
