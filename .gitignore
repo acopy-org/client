@@ -4,6 +4,10 @@
 /android/app/build/
 /android/app/libs/
 
+# Signing
+*.keystore
+*.jks
+
 # IDE
 .idea/
 *.iml
