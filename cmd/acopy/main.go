@@ -117,11 +117,14 @@ func cmdStart(debug bool) {
 func loginSetup(cfg *config.Config) {
 	cfg.ServerURL = "https://acopy.org"
 
-	// Prompt for device name
+	// Confirm device name
 	if cfg.DeviceName == "" {
 		hostname, _ := os.Hostname()
-		cfg.DeviceName = prompt(fmt.Sprintf("Device name [%s]", hostname))
-		if cfg.DeviceName == "" {
+		fmt.Printf("Device name: %s\n", hostname)
+		override := prompt("Press enter to confirm, or type a new name")
+		if override != "" {
+			cfg.DeviceName = override
+		} else {
 			cfg.DeviceName = hostname
 		}
 	}
