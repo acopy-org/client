@@ -90,7 +90,7 @@ func Remove() error {
 	if home != "" {
 		binPath := filepath.Join(home, ".local", "bin", "acopy")
 		if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove binary %s: %w", binPath, err)
+			return fmt.Errorf("cannot remove %s: permission denied", binPath)
 		}
 	}
 	return nil

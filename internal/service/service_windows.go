@@ -65,7 +65,7 @@ func Remove() error {
 	// Remove installed binary
 	binPath := filepath.Join(installDir(), "acopy.exe")
 	if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove binary %s: %w", binPath, err)
+		return fmt.Errorf("cannot remove %s: permission denied", binPath)
 	}
 	return nil
 }

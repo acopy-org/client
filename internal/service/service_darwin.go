@@ -113,7 +113,7 @@ func Remove() error {
 	// Remove installed binary
 	binPath := filepath.Join("/usr/local/bin", "acopy")
 	if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove binary %s: %w (try sudo acopy remove)", binPath, err)
+		return fmt.Errorf("could not remove %s, try: sudo acopy remove", binPath)
 	}
 	return nil
 }

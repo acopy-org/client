@@ -144,7 +144,8 @@ func cmdSetup() {
 
 func cmdRemove() {
 	if err := service.Remove(); err != nil {
-		log.Fatalf("remove: %v", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
 	}
 
 	// Clear config (logout)
