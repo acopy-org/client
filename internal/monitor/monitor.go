@@ -1,7 +1,11 @@
 package monitor
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"image"
+	"image/jpeg"
+	_ "image/png"
 	"log"
 	"strings"
 	"sync"
@@ -134,6 +138,18 @@ func (m *Monitor) poll() {
 	m.lastPushHash = hash
 	m.mu.Unlock()
 
+	// Compress large images to JPEG
+	// Compress large images to JPEG
+	if contentType == "image/png" && len(content) > 100*1024 {
+		if compressed, err := compressToJPEG(content); err != nil {
+			log.Printf("image compress: %v (sending original)", err)
+		} else if compressed != nil {
+			log.Printf("compressed image %d -> %d bytes", len(content), len(compressed))
+			content = compressed
+			contentType = "image/jpeg"
+		}
+	}
+
 	err = m.client.Send(protocol.MsgClipboardPush, &protocol.ClipboardPushPayload{
 		Content:     content,
 		Device:      m.device,
@@ -160,7 +176,15 @@ func (m *Monitor) onRemoteClipboard(content []byte, device string, contentType s
 
 	var clipURL string
 	if strings.HasPrefix(contentType, "image/") && id != "" {
-		clipURL = strings.TrimRight(m.serverURL, "/") + "/c/" + id
+		ext := ".png"
+		if contentType == "image/jpeg" {
+			ext = ".jpg"
+		} else if contentType == "image/gif" {
+			ext = ".gif"
+		} else if contentType == "image/webp" {
+			ext = ".webp"
+		}
+		clipURL = strings.TrimRight(m.serverURL, "/") + "/c/" + id + ext
 	}
 
 	if err := clipboard.Write(content, contentType, clipURL); err != nil {
@@ -181,4 +205,22 @@ func (m *Monitor) onRemoteClipboard(content []byte, device string, contentType s
 	m.mu.Unlock()
 
 	log.Printf("clipboard updated from %s", device)
+}
+
+const jpegQuality = 80
+
+func compressToJPEG(pngData []byte) ([]byte, error) {
+	img, _, err := image.Decode(bytes.NewReader(pngData))
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: jpegQuality}); err != nil {
+		return nil, err
+	}
+	// Only use compressed version if it's actually smaller
+	if buf.Len() >= len(pngData) {
+		return nil, nil
+	}
+	return buf.Bytes(), nil
 }
