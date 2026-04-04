@@ -19,7 +19,8 @@ class SyncClient(
     private val onClipboard: (content: ByteArray, device: String, contentType: String) -> Unit,
     private val onConnectionState: (connected: Boolean) -> Unit,
     private val onError: (msg: String) -> Unit,
-    private val onDeviceRenamed: (oldName: String, newName: String) -> Unit = { _, _ -> }
+    private val onDeviceRenamed: (oldName: String, newName: String) -> Unit = { _, _ -> },
+    private val onDeviceId: (deviceId: String) -> Unit = {}
 ) {
     private val client = OkHttpClient.Builder()
         .pingInterval(30, TimeUnit.SECONDS)
@@ -137,6 +138,12 @@ class SyncClient(
                     ws.set(webSocket)
                     backoff = BACKOFF_INITIAL
                     Log.d(TAG, "connected and authenticated")
+                    try {
+                        val ack = Codec.decodeAck(raw)
+                        if (ack.deviceId != null) {
+                            onDeviceId(ack.deviceId)
+                        }
+                    } catch (_: Exception) { }
                     onConnectionState(true)
                     flushPending()
                 }

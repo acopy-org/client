@@ -12,6 +12,7 @@ type Config struct {
 	ServerURL  string `toml:"server_url"`
 	DeviceName string `toml:"device_name"`
 	Token      string `toml:"token"`
+	DeviceID   string `toml:"device_id,omitempty"`
 }
 
 func Dir() (string, error) {

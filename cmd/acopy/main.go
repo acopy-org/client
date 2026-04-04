@@ -129,6 +129,15 @@ func cmdStart(debug bool) {
 		mon.Debug = true
 	}
 
+	client.OnDeviceId = func(deviceID string) {
+		if cfg.DeviceID != deviceID {
+			cfg.DeviceID = deviceID
+			if err := cfg.Save(); err != nil {
+				log.Printf("save config after device id: %v", err)
+			}
+		}
+	}
+
 	client.OnDeviceRenamed = func(oldName, newName string) {
 		if oldName == cfg.DeviceName {
 			cfg.DeviceName = newName

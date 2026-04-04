@@ -28,6 +28,10 @@ class ConfigStore(context: Context) {
         get() = prefs.getString(KEY_DEVICE_NAME, defaultDeviceName()) ?: defaultDeviceName()
         set(value) = prefs.edit().putString(KEY_DEVICE_NAME, value).apply()
 
+    var deviceId: String
+        get() = prefs.getString(KEY_DEVICE_ID, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_DEVICE_ID, value).apply()
+
     val isLoggedIn: Boolean
         get() = token.isNotEmpty()
 
@@ -41,6 +45,7 @@ class ConfigStore(context: Context) {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_TOKEN = "token"
         private const val KEY_DEVICE_NAME = "device_name"
+        private const val KEY_DEVICE_ID = "device_id"
         private const val DEFAULT_SERVER_URL = "https://acopy.org"
     }
 }

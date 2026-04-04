@@ -95,8 +95,14 @@ class AcopyService : Service() {
             onDeviceRenamed = { oldName, newName ->
                 if (oldName == config.deviceName) {
                     config.deviceName = newName
+                    sendBroadcast(Intent(ACTION_DEVICE_RENAMED).setPackage(packageName)
+                        .putExtra(EXTRA_DEVICE_NAME, newName))
                     Log.d(TAG, "Device renamed: $oldName -> $newName")
                 }
+            },
+            onDeviceId = { deviceId ->
+                config.deviceId = deviceId
+                Log.d(TAG, "Device ID: $deviceId")
             }
         )
         client.start()
@@ -163,9 +169,11 @@ class AcopyService : Service() {
         private const val NOTIFICATION_ID = 1
         const val ACTION_STATUS = "org.acopy.android.STATUS"
         const val ACTION_PUSH_CLIPBOARD = "org.acopy.android.PUSH_CLIPBOARD"
+        const val ACTION_DEVICE_RENAMED = "org.acopy.android.DEVICE_RENAMED"
         const val EXTRA_STATUS = "status"
         const val EXTRA_CLIPBOARD = "clipboard"
         const val EXTRA_CONTENT_TYPE = "content_type"
+        const val EXTRA_DEVICE_NAME = "device_name"
 
         @Volatile
         var currentStatus: String = "Stopped"

@@ -10,7 +10,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.widget.EditText
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -37,8 +39,16 @@ class MainActivity : AppCompatActivity() {
 
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val status = intent.getStringExtra(AcopyService.EXTRA_STATUS) ?: return
-            binding.tvStatus.text = status
+            when (intent.action) {
+                AcopyService.ACTION_STATUS -> {
+                    val status = intent.getStringExtra(AcopyService.EXTRA_STATUS) ?: return
+                    binding.tvStatus.text = status
+                }
+                AcopyService.ACTION_DEVICE_RENAMED -> {
+                    val name = intent.getStringExtra(AcopyService.EXTRA_DEVICE_NAME) ?: return
+                    binding.tvDevice.text = name
+                }
+            }
         }
     }
 
@@ -64,17 +74,27 @@ class MainActivity : AppCompatActivity() {
             config.clear()
             updateUI()
         }
+
+        binding.tvDevice.setOnClickListener { showRenameDialog() }
+
+        binding.btnAccessibility.setOnClickListener {
+            ClipboardAccessibilityService.openSettings(this)
+        }
     }
 
     override fun onResume() {
         super.onResume()
+        val filter = IntentFilter().apply {
+            addAction(AcopyService.ACTION_STATUS)
+            addAction(AcopyService.ACTION_DEVICE_RENAMED)
+        }
         ContextCompat.registerReceiver(
-            this, statusReceiver,
-            IntentFilter(AcopyService.ACTION_STATUS),
+            this, statusReceiver, filter,
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
         if (config.isLoggedIn) {
             binding.tvStatus.text = AcopyService.currentStatus
+            updateAccessibilityButton()
             pushClipboardIfNew()
         }
     }
@@ -140,10 +160,20 @@ class MainActivity : AppCompatActivity() {
             binding.statusGroup.visibility = View.VISIBLE
             binding.tvDevice.text = config.deviceName
             binding.tvServer.text = config.serverUrl
+            updateAccessibilityButton()
             AcopyService.start(this)
         } else {
             binding.authGroup.visibility = View.VISIBLE
             binding.statusGroup.visibility = View.GONE
+        }
+    }
+
+    private fun updateAccessibilityButton() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val enabled = ClipboardAccessibilityService.isEnabled(this)
+            binding.btnAccessibility.visibility = if (enabled) View.GONE else View.VISIBLE
+        } else {
+            binding.btnAccessibility.visibility = View.GONE
         }
     }
 
@@ -206,6 +236,59 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     setLoading(false)
                     Toast.makeText(this, e.message ?: "Connection failed", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun showRenameDialog() {
+        val deviceId = config.deviceId
+        if (deviceId.isEmpty()) {
+            Toast.makeText(this, "Device ID not available yet", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val input = EditText(this).apply {
+            setText(config.deviceName)
+            selectAll()
+            setPadding(48, 32, 48, 16)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Rename device")
+            .setView(input)
+            .setPositiveButton("Rename") { _, _ ->
+                val newName = input.text.toString().trim()
+                if (newName.isNotEmpty() && newName != config.deviceName) {
+                    renameDevice(deviceId, newName)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun renameDevice(deviceId: String, newName: String) {
+        thread {
+            try {
+                val body = JSONObject().apply { put("device_name", newName) }
+                val request = Request.Builder()
+                    .url("${config.serverUrl}/api/devices/$deviceId")
+                    .header("Authorization", "Bearer ${config.token}")
+                    .patch(body.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+                val response = http.newCall(request).execute()
+                val code = response.code
+                response.close()
+                if (code == 200) {
+                    runOnUiThread {
+                        binding.tvDevice.text = newName
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this, "Rename failed (status $code)", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, e.message ?: "Rename failed", Toast.LENGTH_SHORT).show()
                 }
             }
         }

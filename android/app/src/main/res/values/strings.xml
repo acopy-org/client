@@ -10,4 +10,6 @@
     <string name="btn_logout">Log out</string>
     <string name="label_device">Device</string>
     <string name="label_server">Server</string>
+    <string name="accessibility_service_description">Detects copy and cut actions to sync clipboard content across your devices. This service monitors screen interactions to identify when you copy text, then briefly reads the clipboard to sync it.</string>
+    <string name="btn_enable_accessibility">Enable clipboard detection</string>
 </resources>

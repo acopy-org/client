@@ -57,8 +57,9 @@ type ClipboardBroadcastPayload struct {
 }
 
 type AckPayload struct {
-	OK           bool `msgpack:"ok"`
-	ProcessingMs int  `msgpack:"processing_ms,omitempty"`
+	OK           bool   `msgpack:"ok"`
+	ProcessingMs int    `msgpack:"processing_ms,omitempty"`
+	DeviceID     string `msgpack:"device_id,omitempty"`
 }
 
 type ErrorPayload struct {

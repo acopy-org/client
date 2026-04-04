@@ -42,6 +42,7 @@ type Client struct {
 	OnConnectionState func(connected bool)
 	OnDeviceRenamed   func(oldName, newName string)
 	OnDeviceDeleted   func(deviceID string)
+	OnDeviceId        func(deviceID string)
 
 	done chan struct{}
 }
@@ -266,6 +267,12 @@ func (c *Client) connect() error {
 	if msgType != protocol.MsgAck {
 		c.closeConn()
 		return fmt.Errorf("unexpected response to auth: message type %d", msgType)
+	}
+
+	if ack, err := protocol.DecodePayload[protocol.AckPayload](raw); err == nil && ack.DeviceID != "" {
+		if c.OnDeviceId != nil {
+			c.OnDeviceId(ack.DeviceID)
+		}
 	}
 
 	log.Println("connected and authenticated")

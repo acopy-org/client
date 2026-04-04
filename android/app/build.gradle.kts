@@ -4,7 +4,12 @@ plugins {
 }
 
 val appVersionName: String = project.findProperty("APP_VERSION")?.toString()?.removePrefix("v") ?: "1.0.0"
-val appVersionCode: Int = appVersionName.split(".").lastOrNull()?.toIntOrNull() ?: 1
+val appVersionCode: Int = appVersionName.split(".").let { parts ->
+    val major = parts.getOrNull(0)?.toIntOrNull() ?: 0
+    val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
+    major * 10000 + minor * 100 + patch
+}
 
 android {
     namespace = "org.acopy.android"
