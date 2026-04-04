@@ -163,6 +163,10 @@ class SyncClient(
                 Log.d(TAG, "device renamed: ${payload.oldName} -> ${payload.newName}")
                 onDeviceRenamed(payload.oldName, payload.newName)
             }
+            MsgType.DEVICE_DELETED -> {
+                val payload = Codec.decodeDeviceDeleted(raw)
+                Log.d(TAG, "device deleted: ${payload.deviceId}")
+            }
             else -> Log.w(TAG, "unexpected message type: $msgType")
         }
     }

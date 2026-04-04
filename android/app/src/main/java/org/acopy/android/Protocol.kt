@@ -23,7 +23,8 @@ enum class MsgType(val value: Byte) {
     PONG(0x07),
     COPY_INTENT(0x08),
     COPY_CANCEL(0x09),
-    DEVICE_RENAMED(0x0A);
+    DEVICE_RENAMED(0x0A),
+    DEVICE_DELETED(0x0B);
 
     companion object {
         fun from(value: Byte): MsgType? = entries.find { it.value == value }
@@ -35,6 +36,7 @@ data class ClipboardPushPayload(val content: ByteArray, val device: String, val 
 data class ClipboardBroadcastPayload(val id: String = "", val content: ByteArray, val device: String, val contentType: String = "text/plain", val ts: Long = 0)
 data class ErrorPayload(val code: Int, val msg: String)
 data class DeviceRenamedPayload(val deviceId: String, val oldName: String, val newName: String)
+data class DeviceDeletedPayload(val deviceId: String)
 
 object Codec {
 
@@ -180,5 +182,19 @@ object Codec {
             }
         }
         return DeviceRenamedPayload(deviceId, oldName, newName)
+    }
+
+    fun decodeDeviceDeleted(raw: ByteArray): DeviceDeletedPayload {
+        var deviceId = ""
+        MessagePack.newDefaultUnpacker(raw).use { unpacker ->
+            val mapSize = unpacker.unpackMapHeader()
+            repeat(mapSize) {
+                when (unpacker.unpackString()) {
+                    "device_id" -> deviceId = unpacker.unpackString()
+                    else -> unpacker.skipValue()
+                }
+            }
+        }
+        return DeviceDeletedPayload(deviceId)
     }
 }

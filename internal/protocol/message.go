@@ -33,6 +33,7 @@ const (
 	MsgCopyIntent         MsgType = 0x08
 	MsgCopyCancel         MsgType = 0x09
 	MsgDeviceRenamed      MsgType = 0x0A
+	MsgDeviceDeleted      MsgType = 0x0B
 )
 
 // Payloads
@@ -73,6 +74,10 @@ type DeviceRenamedPayload struct {
 	DeviceID string `msgpack:"device_id"`
 	OldName  string `msgpack:"old_name"`
 	NewName  string `msgpack:"new_name"`
+}
+
+type DeviceDeletedPayload struct {
+	DeviceID string `msgpack:"device_id"`
 }
 
 // Codec holds reusable zstd encoder/decoder.

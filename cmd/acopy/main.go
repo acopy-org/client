@@ -109,6 +109,10 @@ func cmdStart(debug bool) {
 		}
 	}
 
+	client.OnDeviceDeleted = func(deviceID string) {
+		log.Printf("a device was removed (id: %s)", deviceID)
+	}
+
 	// Handle shutdown
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)

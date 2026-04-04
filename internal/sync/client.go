@@ -41,6 +41,7 @@ type Client struct {
 	OnClipboard       func(content []byte, device string, contentType string, id string)
 	OnConnectionState func(connected bool)
 	OnDeviceRenamed   func(oldName, newName string)
+	OnDeviceDeleted   func(deviceID string)
 
 	done chan struct{}
 }
@@ -371,6 +372,17 @@ func (c *Client) readLoop() error {
 			log.Printf("device renamed: %q -> %q", p.OldName, p.NewName)
 			if c.OnDeviceRenamed != nil {
 				c.OnDeviceRenamed(p.OldName, p.NewName)
+			}
+
+		case protocol.MsgDeviceDeleted:
+			p, err := protocol.DecodePayload[protocol.DeviceDeletedPayload](raw)
+			if err != nil {
+				log.Printf("decode device deleted: %v", err)
+				continue
+			}
+			log.Printf("device deleted: %s", p.DeviceID)
+			if c.OnDeviceDeleted != nil {
+				c.OnDeviceDeleted(p.DeviceID)
 			}
 
 		case protocol.MsgPong:
