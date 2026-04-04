@@ -12,6 +12,9 @@ var (
 	getClipboardSequenceNumber = user32.NewProc("GetClipboardSequenceNumber")
 )
 
+// HasNativeClipboard reports whether a system clipboard is available.
+func HasNativeClipboard() bool { return true }
+
 // ChangeCount calls Win32 GetClipboardSequenceNumber.
 // Returns a counter that increments on every clipboard change.
 // Single syscall, no process spawn, no data read.

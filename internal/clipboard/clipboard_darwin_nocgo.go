@@ -17,6 +17,9 @@ var (
 	mu       sync.Mutex
 )
 
+// HasNativeClipboard reports whether a system clipboard is available.
+func HasNativeClipboard() bool { return true }
+
 // ChangeCount detects clipboard changes by hashing clipboard types only.
 // IMPORTANT: We only hash clipboard TYPES, not content, because reading image
 // content via AppleScript modifies clipboard state and causes double-push.

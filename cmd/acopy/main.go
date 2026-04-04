@@ -2,16 +2,22 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
 	"golang.org/x/term"
 
 	"github.com/riz/acopy-client/internal/auth"
+	"github.com/riz/acopy-client/internal/clipboard"
 	"github.com/riz/acopy-client/internal/config"
 	"github.com/riz/acopy-client/internal/monitor"
 	"github.com/riz/acopy-client/internal/service"
@@ -24,6 +30,22 @@ var Version = "dev"
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lmsgprefix)
 	log.SetPrefix("acopy: ")
+
+	// Symlink mode: act as xclip/xsel/pbcopy/pbpaste
+	switch filepath.Base(os.Args[0]) {
+	case "xclip":
+		shimXclip()
+		return
+	case "xsel":
+		shimXsel()
+		return
+	case "pbcopy":
+		cmdCopy()
+		return
+	case "pbpaste":
+		cmdPaste()
+		return
+	}
 
 	if len(os.Args) < 2 {
 		usage()
@@ -42,6 +64,12 @@ func main() {
 		cmdRemove()
 	case "status":
 		cmdStatus()
+	case "copy":
+		cmdCopy()
+	case "paste":
+		cmdPaste()
+	case "install-shims":
+		cmdInstallShims()
 	case "version", "--version", "-v":
 		fmt.Println("acopy " + Version)
 	default:
@@ -59,6 +87,9 @@ commands:
   stop        Stop the service
   remove      Remove system service
   status      Show config and service status
+  copy          Push stdin to clipboard (e.g. echo hi | acopy copy)
+  paste         Output latest clipboard to stdout
+  install-shims Create xclip/xsel/pbcopy/pbpaste symlinks
   start         Start clipboard sync (foreground)
   start debug   Start with verbose timestamped logging
   version       Show version`)
@@ -194,6 +225,13 @@ func cmdSetup() {
 		log.Fatalf("setup: %v", err)
 	}
 	fmt.Println("service installed and started")
+
+	// Install clipboard shims on headless systems
+	if !clipboard.HasNativeClipboard() {
+		fmt.Println()
+		fmt.Println("no display detected — installing clipboard shims...")
+		cmdInstallShims()
+	}
 }
 
 func cmdStop() {
@@ -217,6 +255,9 @@ func cmdRemove() {
 		cfg.Save()
 	}
 
+	// Remove clipboard shim symlinks if they point to acopy
+	removeShims()
+
 	fmt.Println("service stopped, logged out, and removed")
 }
 
@@ -235,6 +276,180 @@ func cmdStatus() {
 
 	svc, _ := service.Status()
 	fmt.Printf("service: %s\n", svc)
+}
+
+func cmdCopy() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+	cfg.ServerURL = "https://acopy.org"
+	if cfg.Token == "" {
+		log.Fatalf("not configured — run: acopy setup")
+	}
+	if cfg.DeviceName == "" {
+		cfg.DeviceName, _ = os.Hostname()
+	}
+
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		log.Fatalf("read stdin: %v", err)
+	}
+	data = bytes.TrimRight(data, "\n")
+	if len(data) == 0 {
+		log.Fatalf("empty input")
+	}
+
+	contentType := "text/plain"
+	if len(data) > 8 && string(data[:4]) == "\x89PNG" {
+		contentType = "image/png"
+	}
+
+	req, err := http.NewRequest("POST", cfg.ServerURL+"/api/clipboard/push", bytes.NewReader(data))
+	if err != nil {
+		log.Fatalf("create request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	req.Header.Set("X-Acopy-Device", cfg.DeviceName)
+	req.Header.Set("X-Acopy-Content-Type", contentType)
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatalf("push: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 201 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Fatalf("push failed: %d %s", resp.StatusCode, body)
+	}
+}
+
+func cmdPaste() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("user home: %v", err)
+	}
+
+	latest := filepath.Join(home, ".cache", "acopy", "latest")
+	target, err := os.Readlink(latest)
+	if err != nil {
+		log.Fatalf("no clipboard content available")
+	}
+
+	path := target
+	if !filepath.IsAbs(target) {
+		path = filepath.Join(home, ".cache", "acopy", target)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatalf("read clipboard: %v", err)
+	}
+
+	os.Stdout.Write(data)
+}
+
+func shimXclip() {
+	for _, arg := range os.Args[1:] {
+		if arg == "-o" {
+			cmdPaste()
+			return
+		}
+	}
+	cmdCopy()
+}
+
+func shimXsel() {
+	for _, arg := range os.Args[1:] {
+		if arg == "-o" || arg == "--output" {
+			cmdPaste()
+			return
+		}
+	}
+	// xsel with no flags also outputs, unlike xclip
+	hasInput := false
+	for _, arg := range os.Args[1:] {
+		if arg == "-i" || arg == "--input" {
+			hasInput = true
+			break
+		}
+	}
+	if !hasInput && len(os.Args) > 1 {
+		cmdPaste()
+		return
+	}
+	cmdCopy()
+}
+
+func cmdInstallShims() {
+	acopyBin, err := exec.LookPath("acopy")
+	if err != nil {
+		// Fall back to our own executable path
+		acopyBin, err = os.Executable()
+		if err != nil {
+			log.Fatalf("resolve acopy path: %v", err)
+		}
+	}
+	acopyBin, _ = filepath.Abs(acopyBin)
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("user home: %v", err)
+	}
+	dir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		log.Fatalf("mkdir: %v", err)
+	}
+
+	for _, name := range []string{"xclip", "xsel", "pbcopy", "pbpaste"} {
+		link := filepath.Join(dir, name)
+		os.Remove(link)
+		if err := os.Symlink(acopyBin, link); err != nil {
+			log.Printf("symlink %s: %v", name, err)
+		} else {
+			fmt.Printf("  %s -> %s\n", link, acopyBin)
+		}
+	}
+
+	// Check if ~/.local/bin is in PATH
+	pathDirs := filepath.SplitList(os.Getenv("PATH"))
+	found := false
+	for _, d := range pathDirs {
+		if d == dir {
+			found = true
+			break
+		}
+	}
+	if !found {
+		fmt.Printf("\nadd to your shell profile:\n  export PATH=\"%s:$PATH\"\n", dir)
+	}
+}
+
+func removeShims() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	acopyBin, _ := os.Executable()
+	acopyBin, _ = filepath.Abs(acopyBin)
+
+	dir := filepath.Join(home, ".local", "bin")
+	for _, name := range []string{"xclip", "xsel", "pbcopy", "pbpaste"} {
+		link := filepath.Join(dir, name)
+		target, err := os.Readlink(link)
+		if err != nil {
+			continue
+		}
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(dir, target)
+		}
+		if target == acopyBin {
+			os.Remove(link)
+			fmt.Printf("  removed shim %s\n", link)
+		}
+	}
 }
 
 func prompt(label string) string {

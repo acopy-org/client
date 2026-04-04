@@ -21,6 +21,9 @@ import (
 )
 
 // ChangeCount returns NSPasteboard's native change counter.
+// HasNativeClipboard reports whether a system clipboard is available.
+func HasNativeClipboard() bool { return true }
+
 func ChangeCount() int64 {
 	return int64(C.clipboardChangeCount())
 }
