@@ -27,11 +27,11 @@ func ChangeCount() int64 {
 
 	// Hash ONLY the types list - do NOT read actual content here!
 	// Reading PNG from clipboard via AppleScript modifies clipboard state.
-	types, _ := exec.Command("osascript", "-e", "clipboard info").Output()
+	types, _ := exec.Command("/usr/bin/osascript", "-e", "clipboard info").Output()
 	h.Write(types)
 
 	// Also hash current text content (pbpaste doesn't modify clipboard)
-	if text, err := exec.Command("pbpaste").Output(); err == nil {
+	if text, err := exec.Command("/usr/bin/pbpaste").Output(); err == nil {
 		h.Write(text)
 	}
 
@@ -62,7 +62,7 @@ set theFile to open for access POSIX file %q with write permission
 write theImage to theFile
 close access theFile`, tmpPath)
 
-		if err := exec.Command("osascript", "-e", script).Run(); err == nil {
+		if err := exec.Command("/usr/bin/osascript", "-e", script).Run(); err == nil {
 			data, err := os.ReadFile(tmpPath)
 			if err == nil && len(data) > 0 {
 				return data, "image/png", nil
@@ -71,7 +71,7 @@ close access theFile`, tmpPath)
 	}
 
 	// Fall back to text
-	out, err := exec.Command("pbpaste").Output()
+	out, err := exec.Command("/usr/bin/pbpaste").Output()
 	if err != nil {
 		return nil, "", fmt.Errorf("pbpaste: %w", err)
 	}
@@ -88,7 +88,7 @@ func Write(data []byte, contentType string, clipURL string) error {
 		}
 		return writeImage(data)
 	}
-	cmd := exec.Command("pbcopy")
+	cmd := exec.Command("/usr/bin/pbcopy")
 	cmd.Stdin = bytes.NewReader(data)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("pbcopy: %w", err)
@@ -110,14 +110,14 @@ func writeImage(data []byte) error {
 	f.Close()
 
 	script := fmt.Sprintf(`set the clipboard to (read POSIX file %q as «class PNGf»)`, f.Name())
-	if err := exec.Command("osascript", "-e", script).Run(); err != nil {
+	if err := exec.Command("/usr/bin/osascript", "-e", script).Run(); err != nil {
 		return fmt.Errorf("osascript set clipboard: %w", err)
 	}
 	return nil
 }
 
 func writeImageWithURL(data []byte, url string) error {
-	if _, err := exec.LookPath("swift"); err != nil {
+	if _, err := exec.LookPath("/usr/bin/swift"); err != nil {
 		return writeImage(data)
 	}
 
@@ -142,7 +142,7 @@ pb.setData(imgData, forType: .png)
 pb.setString(%q, forType: .string)
 `, f.Name(), url)
 
-	cmd := exec.Command("swift", "-e", swift)
+	cmd := exec.Command("/usr/bin/swift", "-e", swift)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("swift clipboard: %w: %s", err, out)
 	}

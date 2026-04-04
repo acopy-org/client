@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"text/template"
+	"time"
 )
 
 const plistName = "com.acopy.client"
@@ -35,9 +36,7 @@ var plistTmpl = template.Must(template.New("plist").Parse(`<?xml version="1.0" e
     <key>StandardErrorPath</key>
     <string>{{ .LogDir }}/acopy.err</string>
     <key>ProcessType</key>
-    <string>Background</string>
-    <key>LowPriorityBackgroundIO</key>
-    <true/>
+    <string>Adaptive</string>
 </dict>
 </plist>
 `))
@@ -60,8 +59,10 @@ func Setup(binPath string) error {
 		return err
 	}
 
-	// Copy binary to a stable location
-	installDir := filepath.Join("/usr/local/bin")
+	// Copy binary to a stable location in user's home
+	home, _ := os.UserHomeDir()
+	installDir := filepath.Join(home, ".local", "bin")
+	os.MkdirAll(installDir, 0o755)
 	installPath := filepath.Join(installDir, "acopy")
 	if abs != installPath {
 		src, err := os.ReadFile(abs)
@@ -81,7 +82,6 @@ func Setup(binPath string) error {
 	}
 	defer f.Close()
 
-	home, _ := os.UserHomeDir()
 	err = plistTmpl.Execute(f, struct {
 		Label   string
 		BinPath string
@@ -103,12 +103,13 @@ func Setup(binPath string) error {
 
 	// Remove any previously loaded service
 	_ = exec.Command("launchctl", "bootout", target).Run()
+	time.Sleep(500 * time.Millisecond)
 
 	// Bootstrap (load + start) using modern launchctl
-	if err := exec.Command("launchctl", "bootstrap", domain, path).Run(); err != nil {
+	if out, err := exec.Command("launchctl", "bootstrap", domain, path).CombinedOutput(); err != nil {
 		// Fallback to legacy load for older macOS
-		if err2 := exec.Command("launchctl", "load", path).Run(); err2 != nil {
-			return fmt.Errorf("launchctl: %w", err2)
+		if out2, err2 := exec.Command("launchctl", "load", path).CombinedOutput(); err2 != nil {
+			return fmt.Errorf("launchctl bootstrap: %s; load: %s", out, out2)
 		}
 	}
 
@@ -140,9 +141,10 @@ func Remove() error {
 	}
 
 	// Remove installed binary
-	binPath := filepath.Join("/usr/local/bin", "acopy")
+	home, _ := os.UserHomeDir()
+	binPath := filepath.Join(home, ".local", "bin", "acopy")
 	if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("could not remove %s, try: sudo acopy remove", binPath)
+		return fmt.Errorf("remove binary: %w", err)
 	}
 	return nil
 }
