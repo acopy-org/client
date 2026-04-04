@@ -124,8 +124,8 @@ class MainActivity : AppCompatActivity() {
             lastPushedHash = hash
             var actualMime = mimeType
             if (bytes.size > ClipboardBridge.MAX_PAYLOAD_SIZE) {
-                bytes = ClipboardBridge.compressToJpeg(bytes) ?: return
-                actualMime = "image/jpeg"
+                bytes = ClipboardBridge.compressToWebP(bytes) ?: return
+                actualMime = "image/webp"
                 if (bytes.size > ClipboardBridge.MAX_PAYLOAD_SIZE) return
             }
             AcopyService.pushClipboard(this, bytes, actualMime)

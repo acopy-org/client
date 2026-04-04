@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.util.Log
 import java.io.ByteArrayOutputStream
 
@@ -57,9 +58,9 @@ class ClipboardBridge(
 
             var actualMime = mimeType
             if (bytes.size > MAX_PAYLOAD_SIZE) {
-                bytes = compressToJpeg(bytes) ?: return
-                actualMime = "image/jpeg"
-                Log.d(TAG, "compressed image to JPEG (${bytes.size} bytes)")
+                bytes = compressToWebP(bytes) ?: return
+                actualMime = "image/webp"
+                Log.d(TAG, "compressed image to WebP (${bytes.size} bytes)")
                 if (bytes.size > MAX_PAYLOAD_SIZE) return
             }
 
@@ -95,10 +96,16 @@ class ClipboardBridge(
         private const val TAG = "ClipboardBridge"
         const val MAX_PAYLOAD_SIZE = 10 * 1024 * 1024
 
-        fun compressToJpeg(imageBytes: ByteArray, quality: Int = 80): ByteArray? {
+        fun compressToWebP(imageBytes: ByteArray, quality: Int = 80): ByteArray? {
             val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size) ?: return null
+            val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Bitmap.CompressFormat.WEBP_LOSSY
+            } else {
+                @Suppress("DEPRECATION")
+                Bitmap.CompressFormat.WEBP
+            }
             val out = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+            bitmap.compress(format, quality, out)
             bitmap.recycle()
             return out.toByteArray()
         }

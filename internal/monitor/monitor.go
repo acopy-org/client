@@ -135,15 +135,14 @@ func (m *Monitor) poll() {
 	m.lastPushHash = hash
 	m.mu.Unlock()
 
-	// Compress large images to JPEG
-	// Compress large images to JPEG
+	// Compress large images
 	if contentType == "image/png" && len(content) > imgcomp.Threshold {
-		if compressed, err := imgcomp.CompressToJPEG(content); err != nil {
+		if compressed, ct, err := imgcomp.CompressImage(content); err != nil {
 			log.Printf("image compress: %v (sending original)", err)
 		} else if compressed != nil {
 			log.Printf("compressed image %d -> %d bytes", len(content), len(compressed))
 			content = compressed
-			contentType = "image/jpeg"
+			contentType = ct
 		}
 	}
 

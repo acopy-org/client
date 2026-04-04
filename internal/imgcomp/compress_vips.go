@@ -17,14 +17,15 @@ func initVips() {
 	})
 }
 
-// CompressToJPEG compresses PNG data to JPEG, downscaling and adjusting quality
+// CompressImage compresses image data to WebP, downscaling and adjusting quality
 // to fit under Threshold bytes. Uses libvips for high performance.
-func CompressToJPEG(pngData []byte) ([]byte, error) {
+// Returns the compressed bytes and the output content type.
+func CompressImage(imgData []byte) ([]byte, string, error) {
 	initVips()
 
-	img, err := vips.NewImageFromBuffer(pngData)
+	img, err := vips.NewImageFromBuffer(imgData)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer img.Close()
 
@@ -36,7 +37,7 @@ func CompressToJPEG(pngData []byte) ([]byte, error) {
 			scale = float64(maxDim) / float64(h)
 		}
 		if err := img.Resize(scale, vips.KernelLanczos3); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	}
 
@@ -45,11 +46,11 @@ func CompressToJPEG(pngData []byte) ([]byte, error) {
 	var best []byte
 	for lo <= hi {
 		mid := (lo + hi) / 2
-		ep := vips.NewJpegExportParams()
+		ep := vips.NewWebpExportParams()
 		ep.Quality = mid
-		buf, _, err := img.ExportJpeg(ep)
+		buf, _, err := img.ExportWebp(ep)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		if len(buf) <= Threshold {
 			best = buf
@@ -59,14 +60,14 @@ func CompressToJPEG(pngData []byte) ([]byte, error) {
 		}
 	}
 	if best != nil {
-		return best, nil
+		return best, "image/webp", nil
 	}
 	// Even quality 10 is too large — return best effort
-	ep := vips.NewJpegExportParams()
+	ep := vips.NewWebpExportParams()
 	ep.Quality = 10
-	buf, _, err := img.ExportJpeg(ep)
+	buf, _, err := img.ExportWebp(ep)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return buf, nil
+	return buf, "image/webp", nil
 }

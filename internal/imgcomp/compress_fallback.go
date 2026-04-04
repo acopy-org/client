@@ -9,12 +9,13 @@ import (
 	_ "image/png"
 )
 
-// CompressToJPEG compresses PNG data to JPEG using pure Go stdlib.
+// CompressImage compresses image data to JPEG using pure Go stdlib.
 // Downscales large images and adjusts quality to fit under Threshold bytes.
-func CompressToJPEG(pngData []byte) ([]byte, error) {
-	img, _, err := image.Decode(bytes.NewReader(pngData))
+// Returns the compressed bytes and the output content type.
+func CompressImage(imgData []byte) ([]byte, string, error) {
+	img, _, err := image.Decode(bytes.NewReader(imgData))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	img = downscale(img, maxDim)
@@ -26,7 +27,7 @@ func CompressToJPEG(pngData []byte) ([]byte, error) {
 		mid := (lo + hi) / 2
 		var buf bytes.Buffer
 		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: mid}); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		if buf.Len() <= Threshold {
 			best = buf.Bytes()
@@ -36,13 +37,13 @@ func CompressToJPEG(pngData []byte) ([]byte, error) {
 		}
 	}
 	if best != nil {
-		return best, nil
+		return best, "image/jpeg", nil
 	}
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 10}); err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return buf.Bytes(), nil
+	return buf.Bytes(), "image/jpeg", nil
 }
 
 func downscale(img image.Image, maxDim int) image.Image {
