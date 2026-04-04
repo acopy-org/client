@@ -128,14 +128,20 @@ func loginSetup(cfg *config.Config) {
 
 	// Auth
 	if cfg.Token == "" {
+		fmt.Println("New users will be automatically registered.")
 		creds := auth.Credentials{
 			Email:    prompt("Email"),
 			Password: promptPassword("Password"),
 		}
 		// Try login first, register if account doesn't exist
 		if err := auth.Login(cfg, creds); err != nil {
+			// New user — confirm password before registering
+			confirm := promptPassword("Confirm password")
+			if confirm != creds.Password {
+				log.Fatalf("passwords do not match")
+			}
 			if regErr := auth.Register(cfg.ServerURL, creds); regErr != nil {
-				log.Fatalf("login: %v", err)
+				log.Fatalf("registration failed: %v", regErr)
 			}
 			fmt.Println("registered successfully")
 			if err := auth.Login(cfg, creds); err != nil {
