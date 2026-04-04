@@ -18,7 +18,8 @@ class SyncClient(
     private val deviceName: String,
     private val onClipboard: (content: ByteArray, device: String, contentType: String) -> Unit,
     private val onConnectionState: (connected: Boolean) -> Unit,
-    private val onError: (msg: String) -> Unit
+    private val onError: (msg: String) -> Unit,
+    private val onDeviceRenamed: (oldName: String, newName: String) -> Unit = { _, _ -> }
 ) {
     private val client = OkHttpClient.Builder()
         .pingInterval(30, TimeUnit.SECONDS)
@@ -157,6 +158,11 @@ class SyncClient(
                 webSocket.send(pongFrame.toByteString())
             }
             MsgType.PONG -> { /* keepalive */ }
+            MsgType.DEVICE_RENAMED -> {
+                val payload = Codec.decodeDeviceRenamed(raw)
+                Log.d(TAG, "device renamed: ${payload.oldName} -> ${payload.newName}")
+                onDeviceRenamed(payload.oldName, payload.newName)
+            }
             else -> Log.w(TAG, "unexpected message type: $msgType")
         }
     }

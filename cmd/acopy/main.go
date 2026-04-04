@@ -96,6 +96,17 @@ func cmdStart(debug bool) {
 		mon.Debug = true
 	}
 
+	client.OnDeviceRenamed = func(oldName, newName string) {
+		if oldName == cfg.DeviceName {
+			cfg.DeviceName = newName
+			mon.SetDevice(newName)
+			if err := cfg.Save(); err != nil {
+				log.Printf("save config after rename: %v", err)
+			}
+			log.Printf("device renamed: %s -> %s", oldName, newName)
+		}
+	}
+
 	// Handle shutdown
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)

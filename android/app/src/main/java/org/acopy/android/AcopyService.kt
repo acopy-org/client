@@ -91,6 +91,12 @@ class AcopyService : Service() {
             },
             onError = { msg ->
                 Log.e(TAG, "Sync error: $msg")
+            },
+            onDeviceRenamed = { oldName, newName ->
+                if (oldName == config.deviceName) {
+                    config.deviceName = newName
+                    Log.d(TAG, "Device renamed: $oldName -> $newName")
+                }
             }
         )
         client.start()

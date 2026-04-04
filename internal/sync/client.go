@@ -40,6 +40,7 @@ type Client struct {
 
 	OnClipboard       func(content []byte, device string, contentType string, id string)
 	OnConnectionState func(connected bool)
+	OnDeviceRenamed   func(oldName, newName string)
 
 	done chan struct{}
 }
@@ -359,6 +360,17 @@ func (c *Client) readLoop() error {
 			log.Printf("server error: [%d] %s", p.Code, p.Msg)
 			if p.Code == 401 {
 				return fmt.Errorf("authentication failed: %s", p.Msg)
+			}
+
+		case protocol.MsgDeviceRenamed:
+			p, err := protocol.DecodePayload[protocol.DeviceRenamedPayload](raw)
+			if err != nil {
+				log.Printf("decode device renamed: %v", err)
+				continue
+			}
+			log.Printf("device renamed: %q -> %q", p.OldName, p.NewName)
+			if c.OnDeviceRenamed != nil {
+				c.OnDeviceRenamed(p.OldName, p.NewName)
 			}
 
 		case protocol.MsgPong:

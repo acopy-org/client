@@ -22,7 +22,8 @@ enum class MsgType(val value: Byte) {
     PING(0x06),
     PONG(0x07),
     COPY_INTENT(0x08),
-    COPY_CANCEL(0x09);
+    COPY_CANCEL(0x09),
+    DEVICE_RENAMED(0x0A);
 
     companion object {
         fun from(value: Byte): MsgType? = entries.find { it.value == value }
@@ -33,6 +34,7 @@ data class AuthPayload(val token: String)
 data class ClipboardPushPayload(val content: ByteArray, val device: String, val contentType: String = "text/plain")
 data class ClipboardBroadcastPayload(val id: String = "", val content: ByteArray, val device: String, val contentType: String = "text/plain", val ts: Long = 0)
 data class ErrorPayload(val code: Int, val msg: String)
+data class DeviceRenamedPayload(val deviceId: String, val oldName: String, val newName: String)
 
 object Codec {
 
@@ -160,5 +162,23 @@ object Codec {
             }
         }
         return ErrorPayload(code, msg)
+    }
+
+    fun decodeDeviceRenamed(raw: ByteArray): DeviceRenamedPayload {
+        var deviceId = ""
+        var oldName = ""
+        var newName = ""
+        MessagePack.newDefaultUnpacker(raw).use { unpacker ->
+            val mapSize = unpacker.unpackMapHeader()
+            repeat(mapSize) {
+                when (unpacker.unpackString()) {
+                    "device_id" -> deviceId = unpacker.unpackString()
+                    "old_name" -> oldName = unpacker.unpackString()
+                    "new_name" -> newName = unpacker.unpackString()
+                    else -> unpacker.skipValue()
+                }
+            }
+        }
+        return DeviceRenamedPayload(deviceId, oldName, newName)
     }
 }

@@ -37,6 +37,12 @@ func (m *Monitor) debugf(format string, args ...any) {
 	}
 }
 
+func (m *Monitor) SetDevice(name string) {
+	m.mu.Lock()
+	m.device = name
+	m.mu.Unlock()
+}
+
 func (m *Monitor) cancelIntent(wasSent bool) {
 	if !wasSent {
 		return

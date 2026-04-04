@@ -32,6 +32,7 @@ const (
 	MsgPong               MsgType = 0x07
 	MsgCopyIntent         MsgType = 0x08
 	MsgCopyCancel         MsgType = 0x09
+	MsgDeviceRenamed      MsgType = 0x0A
 )
 
 // Payloads
@@ -66,6 +67,12 @@ type ErrorPayload struct {
 
 type CopyIntentPayload struct {
 	Device string `msgpack:"device"`
+}
+
+type DeviceRenamedPayload struct {
+	DeviceID string `msgpack:"device_id"`
+	OldName  string `msgpack:"old_name"`
+	NewName  string `msgpack:"new_name"`
 }
 
 // Codec holds reusable zstd encoder/decoder.
