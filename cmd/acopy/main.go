@@ -343,6 +343,14 @@ func cmdPaste() {
 		path = filepath.Join(home, ".cache", "acopy", target)
 	}
 
+	ext := filepath.Ext(path)
+	if ext == ".png" || ext == ".jpg" || ext == ".jpeg" {
+		// Output the file path for images — pasting binary into a
+		// terminal is never useful. Tools can read the file directly.
+		fmt.Print(path)
+		return
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		log.Fatalf("read clipboard: %v", err)
@@ -351,14 +359,86 @@ func cmdPaste() {
 	os.Stdout.Write(data)
 }
 
+func shimTargets() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	latest := filepath.Join(home, ".cache", "acopy", "latest")
+	target, err := os.Readlink(latest)
+	if err != nil {
+		return
+	}
+	ext := filepath.Ext(target)
+	switch ext {
+	case ".png":
+		fmt.Println("image/png")
+	case ".jpg", ".jpeg":
+		fmt.Println("image/jpeg")
+	default:
+		fmt.Println("UTF8_STRING")
+	}
+}
+
 func shimXclip() {
-	for _, arg := range os.Args[1:] {
+	isOutput := false
+	targetType := ""
+	for i, arg := range os.Args[1:] {
 		if arg == "-o" {
-			cmdPaste()
-			return
+			isOutput = true
+		}
+		if arg == "-t" && i+1 < len(os.Args)-1 {
+			targetType = os.Args[i+2]
 		}
 	}
+	if isOutput {
+		if targetType == "TARGETS" {
+			shimTargets()
+			return
+		}
+		if targetType == "image/png" || targetType == "image/jpeg" {
+			// Explicit image type request — return binary data
+			shimPasteImage(targetType)
+			return
+		}
+		// Default: return text-friendly output (path for images)
+		cmdPaste()
+		return
+	}
 	cmdCopy()
+}
+
+func shimPasteImage(mime string) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("user home: %v", err)
+	}
+	latest := filepath.Join(home, ".cache", "acopy", "latest")
+	target, err := os.Readlink(latest)
+	if err != nil {
+		os.Exit(1)
+	}
+	path := target
+	if !filepath.IsAbs(target) {
+		path = filepath.Join(home, ".cache", "acopy", target)
+	}
+	ext := filepath.Ext(path)
+	// Only serve if the cached content matches the requested type
+	switch mime {
+	case "image/png":
+		if ext != ".png" {
+			os.Exit(1)
+		}
+	case "image/jpeg":
+		if ext != ".jpg" && ext != ".jpeg" {
+			os.Exit(1)
+		}
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		os.Exit(1)
+	}
+	os.Stdout.Write(data)
 }
 
 func shimXsel() {

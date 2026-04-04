@@ -131,17 +131,22 @@ func Read() ([]byte, string, error) {
 // Write sets the clipboard content. If xclip is available, uses it.
 // Otherwise falls back to a cache file.
 func Write(data []byte, contentType string, clipURL string) error {
-	// For images with a URL, write the URL as text so Ctrl+V pastes it
-	if strings.HasPrefix(contentType, "image/") && clipURL != "" {
-		data = []byte(clipURL)
-		contentType = "text/plain"
-	}
-
 	if hasXclip() {
-		args := []string{"-selection", "clipboard"}
-		if contentType == "image/png" {
-			args = append(args, "-t", "image/png")
+		// For images, always put a pasteable string in the clipboard:
+		// the URL if available, otherwise save to cache and use the file path.
+		if strings.HasPrefix(contentType, "image/") {
+			if clipURL != "" {
+				data = []byte(clipURL)
+			} else {
+				if err := saveToCache(data, contentType); err != nil {
+					return err
+				}
+				home, _ := os.UserHomeDir()
+				data = []byte(filepath.Join(home, ".cache", "acopy", "latest"))
+			}
+			contentType = "text/plain"
 		}
+		args := []string{"-selection", "clipboard"}
 		cmd := exec.Command("xclip", args...)
 		cmd.Stdin = bytes.NewReader(data)
 		var stderr bytes.Buffer
