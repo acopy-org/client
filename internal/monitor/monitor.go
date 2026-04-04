@@ -207,20 +207,27 @@ func (m *Monitor) onRemoteClipboard(content []byte, device string, contentType s
 	log.Printf("clipboard updated from %s", device)
 }
 
-const jpegQuality = 80
+const maxImageSize = 100 * 1024 // 100KB
 
 func compressToJPEG(pngData []byte) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(pngData))
 	if err != nil {
 		return nil, err
 	}
-	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: jpegQuality}); err != nil {
-		return nil, err
+	// Try decreasing quality until under 100KB
+	for quality := 80; quality >= 10; quality -= 10 {
+		var buf bytes.Buffer
+		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality}); err != nil {
+			return nil, err
+		}
+		if buf.Len() <= maxImageSize {
+			return buf.Bytes(), nil
+		}
 	}
-	// Only use compressed version if it's actually smaller
-	if buf.Len() >= len(pngData) {
-		return nil, nil
+	// Even quality 10 is too large — return best effort
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 10}); err != nil {
+		return nil, err
 	}
 	return buf.Bytes(), nil
 }
