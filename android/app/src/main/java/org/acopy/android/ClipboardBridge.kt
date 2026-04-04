@@ -25,7 +25,11 @@ class ClipboardBridge(
             return
         }
 
-        val clip = clipboardManager.primaryClip ?: return
+        val clip = clipboardManager.primaryClip
+        if (clip == null) {
+            Log.d(TAG, "clipboard changed but content not accessible (background restriction)")
+            return
+        }
         val item = clip.getItemAt(0) ?: return
 
         // Try text first

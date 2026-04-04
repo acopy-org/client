@@ -37,7 +37,12 @@ class AcopyService : Service() {
             } else {
                 content.contentHashCode()
             }
-            syncClient?.pushClipboard(content, config.deviceName, contentType)
+            val client = syncClient
+            if (client != null) {
+                client.pushClipboard(content, config.deviceName, contentType)
+            } else {
+                Log.w(TAG, "syncClient not ready — clipboard push dropped")
+            }
             return START_STICKY
         }
 
@@ -46,6 +51,9 @@ class AcopyService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+
+        // Already initialized — don't create duplicate listeners/connections
+        if (syncClient != null) return START_STICKY
 
         currentStatus = "Connecting..."
         sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName).putExtra(EXTRA_STATUS, currentStatus))

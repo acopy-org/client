@@ -3,6 +3,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val appVersionName: String = project.findProperty("APP_VERSION")?.toString()?.removePrefix("v") ?: "1.0.0"
+val appVersionCode: Int = appVersionName.split(".").lastOrNull()?.toIntOrNull() ?: 1
+
 android {
     namespace = "org.acopy.android"
     compileSdk = 35
@@ -11,8 +14,8 @@ android {
         applicationId = "org.acopy.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.0.14"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     signingConfigs {
