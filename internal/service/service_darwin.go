@@ -109,6 +109,9 @@ func Remove() error {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove plist: %w", err)
 	}
+
+	// Remove installed binary
+	os.Remove(filepath.Join("/usr/local/bin", "acopy"))
 	return nil
 }
 

@@ -61,6 +61,9 @@ func Remove() error {
 	if err := exec.Command("schtasks", "/Delete", "/TN", taskName, "/F").Run(); err != nil {
 		return fmt.Errorf("schtasks delete: %w", err)
 	}
+
+	// Remove installed binary
+	os.Remove(filepath.Join(installDir(), "acopy.exe"))
 	return nil
 }
 

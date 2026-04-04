@@ -84,6 +84,12 @@ func Remove() error {
 		return fmt.Errorf("remove unit: %w", err)
 	}
 	_ = exec.Command("systemctl", "--user", "daemon-reload").Run()
+
+	// Remove installed binary
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		os.Remove(filepath.Join(home, ".local", "bin", "acopy"))
+	}
 	return nil
 }
 
