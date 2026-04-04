@@ -22,7 +22,7 @@ import (
 var Version = "dev"
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lmsgprefix)
 	log.SetPrefix("acopy: ")
 
 	if len(os.Args) < 2 {
@@ -32,7 +32,8 @@ func main() {
 
 	switch os.Args[1] {
 	case "start":
-		cmdStart()
+		debug := len(os.Args) > 2 && os.Args[2] == "debug"
+		cmdStart(debug)
 	case "setup":
 		cmdSetup()
 	case "stop":
@@ -58,11 +59,16 @@ commands:
   stop        Stop the service
   remove      Remove system service
   status      Show config and service status
-  start       Start clipboard sync (foreground)
-  version     Show version`)
+  start         Start clipboard sync (foreground)
+  start debug   Start with verbose timestamped logging
+  version       Show version`)
 }
 
-func cmdStart() {
+func cmdStart(debug bool) {
+	if debug {
+		log.Printf("starting in debug mode (version %s)", Version)
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("load config: %v", err)
@@ -76,12 +82,19 @@ func cmdStart() {
 		cfg.DeviceName, _ = os.Hostname()
 	}
 
+	if debug {
+		log.Printf("config: server=%s device=%s token=%s...", cfg.ServerURL, cfg.DeviceName, cfg.Token[:min(8, len(cfg.Token))])
+	}
+
 	client, err := acSync.NewClient(cfg.ServerURL, cfg.Token, cfg.DeviceName)
 	if err != nil {
 		log.Fatalf("init client: %v", err)
 	}
 
 	mon := monitor.New(client, cfg.DeviceName, cfg.ServerURL)
+	if debug {
+		mon.Debug = true
+	}
 
 	// Handle shutdown
 	sig := make(chan os.Signal, 1)

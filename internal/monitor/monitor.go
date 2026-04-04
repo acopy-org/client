@@ -19,6 +19,7 @@ type Monitor struct {
 	client    *acSync.Client
 	device    string
 	serverURL string
+	Debug     bool
 
 	mu            sync.Mutex
 	lastCount     int64
@@ -28,6 +29,12 @@ type Monitor struct {
 	lastPushTime  time.Time        // quiet period after push to let clipboard settle
 
 	done chan struct{}
+}
+
+func (m *Monitor) debugf(format string, args ...any) {
+	if m.Debug {
+		log.Printf("[debug] "+format, args...)
+	}
 }
 
 func New(client *acSync.Client, device string, serverURL string) *Monitor {
@@ -75,10 +82,12 @@ func (m *Monitor) poll() {
 		m.mu.Unlock()
 		return
 	}
+	m.debugf("clipboard change detected (count %d -> %d)", m.lastCount, count)
 	m.lastCount = count
 
 	if m.lastWasRemote {
 		m.lastWasRemote = false
+		m.debugf("skipping — was remote write")
 		m.mu.Unlock()
 		return
 	}
@@ -86,6 +95,7 @@ func (m *Monitor) poll() {
 	// Quiet period after push: let clipboard settle (macOS type population,
 	// OSC 52 round-trips via terminal emulator, etc.)
 	if !m.lastPushTime.IsZero() && time.Since(m.lastPushTime) < 2*time.Second {
+		m.debugf("skipping — quiet period (%v since last push)", time.Since(m.lastPushTime))
 		m.mu.Unlock()
 		return
 	}
@@ -93,6 +103,7 @@ func (m *Monitor) poll() {
 	m.pushing = true
 	m.mu.Unlock()
 
+	readStart := time.Now()
 	content, contentType, err := clipboard.Read()
 
 	// Re-snapshot change count after Read(), because on macOS reading
@@ -100,6 +111,8 @@ func (m *Monitor) poll() {
 	m.mu.Lock()
 	m.lastCount = clipboard.ChangeCount()
 	m.mu.Unlock()
+
+	m.debugf("clipboard read: %d bytes, type=%s, took %v", len(content), contentType, time.Since(readStart))
 
 	if err != nil {
 		log.Printf("clipboard read: %v", err)
@@ -110,6 +123,7 @@ func (m *Monitor) poll() {
 	}
 
 	if len(content) == 0 {
+		m.debugf("skipping — empty clipboard")
 		m.mu.Lock()
 		m.pushing = false
 		m.mu.Unlock()
@@ -129,6 +143,7 @@ func (m *Monitor) poll() {
 	m.mu.Lock()
 	if hash == m.lastPushHash {
 		m.pushing = false
+		m.debugf("skipping — duplicate content (hash match)")
 		m.mu.Unlock()
 		return
 	}
@@ -137,10 +152,11 @@ func (m *Monitor) poll() {
 
 	// Compress large images
 	if contentType == "image/png" && len(content) > imgcomp.Threshold {
+		compressStart := time.Now()
 		if compressed, ct, err := imgcomp.CompressImage(content); err != nil {
 			log.Printf("image compress: %v (sending original)", err)
 		} else if compressed != nil {
-			log.Printf("compressed image %d -> %d bytes", len(content), len(compressed))
+			m.debugf("compressed %s %d -> %s %d bytes in %v", contentType, len(content), ct, len(compressed), time.Since(compressStart))
 			content = compressed
 			contentType = ct
 		}
@@ -161,6 +177,7 @@ func (m *Monitor) poll() {
 		log.Printf("push clipboard: %v", err)
 	} else {
 		log.Printf("pushed clipboard (%d bytes, %s)", len(content), contentType)
+		m.debugf("ws connected=%v", m.client.IsConnected())
 	}
 }
 
