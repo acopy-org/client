@@ -24,11 +24,20 @@ var (
 func hasXclip() bool {
 	if !xclipChecked {
 		xclipChecked = true
-		_, err := exec.LookPath("xclip")
+		xclipPath, err := exec.LookPath("xclip")
 		if err != nil {
 			log.Printf("xclip not found — clipboard sync will save to ~/.cache/acopy/")
 			log.Printf("install xclip for full clipboard support: %s", installHint())
 			return false
+		}
+		// If the found xclip is our own shim (symlink to acopy), treat it
+		// as no native clipboard.  Using the shim for writes would POST
+		// back to the server and create a broadcast loop.
+		if target, err := os.Readlink(xclipPath); err == nil {
+			if filepath.Base(target) == "acopy" {
+				log.Printf("xclip is acopy shim — clipboard writes will save to cache")
+				return false
+			}
 		}
 		// Verify xclip can actually connect to a display
 		out, err := exec.Command("xclip", "-selection", "clipboard", "-o").CombinedOutput()
