@@ -76,6 +76,8 @@ func cmdStart(debug bool) {
 	cfg.ServerURL = "https://acopy.org"
 	if cfg.Token == "" {
 		fmt.Println("not configured, running setup...")
+		promptDeviceName(cfg)
+		fmt.Println()
 		loginSetup(cfg)
 	}
 	if cfg.DeviceName == "" {
@@ -128,21 +130,8 @@ func cmdStart(debug bool) {
 func loginSetup(cfg *config.Config) {
 	cfg.ServerURL = "https://acopy.org"
 
-	// Confirm device name
-	if cfg.DeviceName == "" {
-		hostname, _ := os.Hostname()
-		fmt.Printf("Device name: %s\n", hostname)
-		override := prompt("Press enter to confirm, or type a new name")
-		if override != "" {
-			cfg.DeviceName = override
-		} else {
-			cfg.DeviceName = hostname
-		}
-	}
-
 	// Auth
 	if cfg.Token == "" {
-		fmt.Println()
 		fmt.Println("New users will be automatically registered.")
 		creds := auth.Credentials{
 			Email:    prompt("Email"),
@@ -167,12 +156,29 @@ func loginSetup(cfg *config.Config) {
 	}
 }
 
+func promptDeviceName(cfg *config.Config) {
+	hostname, _ := os.Hostname()
+	current := cfg.DeviceName
+	if current == "" {
+		current = hostname
+	}
+	fmt.Printf("Device name: %s\n", current)
+	override := prompt("Press enter to confirm, or type a new name")
+	if override != "" {
+		cfg.DeviceName = override
+	} else if cfg.DeviceName == "" {
+		cfg.DeviceName = hostname
+	}
+}
+
 func cmdSetup() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
 
+	promptDeviceName(cfg)
+	fmt.Println()
 	loginSetup(cfg)
 
 	// Install service
@@ -199,10 +205,11 @@ func cmdRemove() {
 		os.Exit(1)
 	}
 
-	// Clear config (logout)
+	// Clear config (logout + device name)
 	cfg, err := config.Load()
-	if err == nil && cfg.Token != "" {
+	if err == nil {
 		cfg.Token = ""
+		cfg.DeviceName = ""
 		cfg.Save()
 	}
 
