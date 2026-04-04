@@ -61,6 +61,21 @@ class SyncClient(
         }
     }
 
+    fun sendCopyIntent(device: String) {
+        val socket = ws.get() ?: return
+        if (!connected.get()) return
+        val payload = Codec.encodeCopyIntent(device)
+        val frame = Codec.encode(MsgType.COPY_INTENT, payload)
+        socket.send(frame.toByteString())
+    }
+
+    fun sendCopyCancel() {
+        val socket = ws.get() ?: return
+        if (!connected.get()) return
+        val frame = Codec.encode(MsgType.COPY_CANCEL, null)
+        socket.send(frame.toByteString())
+    }
+
     fun isConnected(): Boolean = connected.get()
 
     fun reconnect() {

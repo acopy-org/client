@@ -20,7 +20,9 @@ enum class MsgType(val value: Byte) {
     ACK(0x04),
     ERROR(0x05),
     PING(0x06),
-    PONG(0x07);
+    PONG(0x07),
+    COPY_INTENT(0x08),
+    COPY_CANCEL(0x09);
 
     companion object {
         fun from(value: Byte): MsgType? = entries.find { it.value == value }
@@ -101,6 +103,16 @@ object Codec {
             packer.packString(device)
             packer.packString("content_type")
             packer.packString(contentType)
+        }
+        return out.toByteArray()
+    }
+
+    fun encodeCopyIntent(device: String): ByteArray {
+        val out = ByteArrayOutputStream()
+        MessagePack.newDefaultPacker(out).use { packer ->
+            packer.packMapHeader(1)
+            packer.packString("device")
+            packer.packString(device)
         }
         return out.toByteArray()
     }

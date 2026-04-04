@@ -66,6 +66,7 @@ class AcopyService : Service() {
         )
 
         val cb = ClipboardBridge(this) { content, contentType ->
+            syncClient?.sendCopyIntent(config.deviceName)
             syncClient?.pushClipboard(content, config.deviceName, contentType)
         }
         cb.register()

@@ -30,6 +30,8 @@ const (
 	MsgError              MsgType = 0x05
 	MsgPing               MsgType = 0x06
 	MsgPong               MsgType = 0x07
+	MsgCopyIntent         MsgType = 0x08
+	MsgCopyCancel         MsgType = 0x09
 )
 
 // Payloads
@@ -53,12 +55,17 @@ type ClipboardBroadcastPayload struct {
 }
 
 type AckPayload struct {
-	OK bool `msgpack:"ok"`
+	OK           bool `msgpack:"ok"`
+	ProcessingMs int  `msgpack:"processing_ms,omitempty"`
 }
 
 type ErrorPayload struct {
 	Code int    `msgpack:"code"`
 	Msg  string `msgpack:"msg"`
+}
+
+type CopyIntentPayload struct {
+	Device string `msgpack:"device"`
 }
 
 // Codec holds reusable zstd encoder/decoder.

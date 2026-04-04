@@ -345,7 +345,10 @@ func (c *Client) readLoop() error {
 			}
 
 		case protocol.MsgAck:
-			log.Printf("server ack received")
+			p, _ := protocol.DecodePayload[protocol.AckPayload](raw)
+			if p != nil && p.ProcessingMs > 0 {
+				log.Printf("server ack (processing: %dms)", p.ProcessingMs)
+			}
 
 		case protocol.MsgError:
 			p, err := protocol.DecodePayload[protocol.ErrorPayload](raw)

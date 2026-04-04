@@ -37,6 +37,14 @@ func (m *Monitor) debugf(format string, args ...any) {
 	}
 }
 
+func (m *Monitor) cancelIntent(wasSent bool) {
+	if !wasSent {
+		return
+	}
+	_ = m.client.Send(protocol.MsgCopyCancel, nil)
+	m.debugf("sent copy cancel")
+}
+
 func New(client *acSync.Client, device string, serverURL string) *Monitor {
 	m := &Monitor{
 		client:    client,
@@ -103,6 +111,14 @@ func (m *Monitor) poll() {
 	m.pushing = true
 	m.mu.Unlock()
 
+	// Signal copy intent to server for latency tracking
+	intentSent := false
+	if m.client.IsConnected() {
+		_ = m.client.Send(protocol.MsgCopyIntent, &protocol.CopyIntentPayload{Device: m.device})
+		intentSent = true
+		m.debugf("sent copy intent")
+	}
+
 	readStart := time.Now()
 	content, contentType, err := clipboard.Read()
 
@@ -116,6 +132,7 @@ func (m *Monitor) poll() {
 
 	if err != nil {
 		log.Printf("clipboard read: %v", err)
+		m.cancelIntent(intentSent)
 		m.mu.Lock()
 		m.pushing = false
 		m.mu.Unlock()
@@ -124,6 +141,7 @@ func (m *Monitor) poll() {
 
 	if len(content) == 0 {
 		m.debugf("skipping — empty clipboard")
+		m.cancelIntent(intentSent)
 		m.mu.Lock()
 		m.pushing = false
 		m.mu.Unlock()
@@ -132,6 +150,7 @@ func (m *Monitor) poll() {
 
 	if len(content) > protocol.MaxPayloadSize {
 		log.Printf("clipboard content too large (%d bytes), skipping", len(content))
+		m.cancelIntent(intentSent)
 		m.mu.Lock()
 		m.pushing = false
 		m.mu.Unlock()
@@ -145,6 +164,7 @@ func (m *Monitor) poll() {
 		m.pushing = false
 		m.debugf("skipping — duplicate content (hash match)")
 		m.mu.Unlock()
+		m.cancelIntent(intentSent)
 		return
 	}
 	m.lastPushHash = hash
