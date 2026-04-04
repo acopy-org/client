@@ -52,10 +52,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
-        pushClipboardIfNew()
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -63,7 +59,6 @@ class MainActivity : AppCompatActivity() {
 
         config = ConfigStore(this)
         clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        clipboardManager.addPrimaryClipChangedListener(clipboardListener)
         requestNotificationPermission()
         updateUI()
 
@@ -105,7 +100,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        clipboardManager.removePrimaryClipChangedListener(clipboardListener)
         super.onDestroy()
     }
 
