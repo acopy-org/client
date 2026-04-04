@@ -131,6 +131,7 @@ func loginSetup(cfg *config.Config) {
 
 	// Auth
 	if cfg.Token == "" {
+		fmt.Println()
 		fmt.Println("New users will be automatically registered.")
 		creds := auth.Credentials{
 			Email:    prompt("Email"),
