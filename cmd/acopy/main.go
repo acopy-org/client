@@ -140,7 +140,15 @@ func cmdRemove() {
 	if err := service.Remove(); err != nil {
 		log.Fatalf("remove: %v", err)
 	}
-	fmt.Println("service removed")
+
+	// Clear config (logout)
+	cfg, err := config.Load()
+	if err == nil && cfg.Token != "" {
+		cfg.Token = ""
+		cfg.Save()
+	}
+
+	fmt.Println("service stopped, logged out, and removed")
 }
 
 func cmdStatus() {

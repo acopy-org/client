@@ -63,7 +63,10 @@ func Remove() error {
 	}
 
 	// Remove installed binary
-	os.Remove(filepath.Join(installDir(), "acopy.exe"))
+	binPath := filepath.Join(installDir(), "acopy.exe")
+	if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove binary %s: %w", binPath, err)
+	}
 	return nil
 }
 

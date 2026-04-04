@@ -88,7 +88,10 @@ func Remove() error {
 	// Remove installed binary
 	home, _ := os.UserHomeDir()
 	if home != "" {
-		os.Remove(filepath.Join(home, ".local", "bin", "acopy"))
+		binPath := filepath.Join(home, ".local", "bin", "acopy")
+		if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove binary %s: %w", binPath, err)
+		}
 	}
 	return nil
 }
