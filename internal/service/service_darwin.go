@@ -97,9 +97,16 @@ func Setup(binPath string) error {
 		return fmt.Errorf("write plist: %w", err)
 	}
 
+	// Unload first in case a previous version was loaded
+	_ = exec.Command("launchctl", "unload", path).Run()
+
 	if err := exec.Command("launchctl", "load", path).Run(); err != nil {
 		return fmt.Errorf("launchctl load: %w", err)
 	}
+
+	// Explicitly start in case RunAtLoad didn't trigger
+	_ = exec.Command("launchctl", "start", plistName).Run()
+
 	return nil
 }
 

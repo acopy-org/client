@@ -30,4 +30,12 @@ else
     sudo mv "/tmp/${BIN}" "${INSTALL_DIR}/${BIN}"
 fi
 
-echo "installed. run: acopy setup"
+echo "installed acopy $(acopy version 2>/dev/null | awk '{print $2}')."
+echo ""
+
+# Run setup with terminal input (curl | sh consumes stdin)
+if [ -t 0 ]; then
+    acopy setup
+else
+    acopy setup </dev/tty
+fi
