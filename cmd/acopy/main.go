@@ -16,6 +16,9 @@ import (
 	acSync "github.com/riz/acopy-client/internal/sync"
 )
 
+// Version is set at build time via -ldflags
+var Version = "dev"
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("acopy: ")
@@ -34,6 +37,8 @@ func main() {
 		cmdRemove()
 	case "status":
 		cmdStatus()
+	case "version", "--version", "-v":
+		fmt.Println("acopy " + Version)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		usage()
@@ -48,7 +53,8 @@ commands:
   setup       Register/login + install as system service
   remove      Remove system service
   status      Show config and service status
-  start       Start clipboard sync (foreground)`)
+  start       Start clipboard sync (foreground)
+  version     Show version`)
 }
 
 func cmdStart() {
