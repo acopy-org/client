@@ -115,19 +115,19 @@ func loginSetup(cfg *config.Config) {
 
 	// Auth
 	if cfg.Token == "" {
-		choice := prompt("Login or register? [l/r]")
 		creds := auth.Credentials{
 			Email:    prompt("Email"),
 			Password: promptPassword("Password"),
 		}
-		if strings.HasPrefix(strings.ToLower(choice), "r") {
-			if err := auth.Register(cfg.ServerURL, creds); err != nil {
-				log.Fatalf("register: %v", err)
+		// Try login first, register if account doesn't exist
+		if err := auth.Login(cfg, creds); err != nil {
+			if regErr := auth.Register(cfg.ServerURL, creds); regErr != nil {
+				log.Fatalf("login: %v", err)
 			}
 			fmt.Println("registered successfully")
-		}
-		if err := auth.Login(cfg, creds); err != nil {
-			log.Fatalf("login: %v", err)
+			if err := auth.Login(cfg, creds); err != nil {
+				log.Fatalf("login: %v", err)
+			}
 		}
 		fmt.Println("logged in")
 	}
@@ -201,10 +201,35 @@ func prompt(label string) string {
 
 func promptPassword(label string) string {
 	fmt.Printf("%s: ", label)
-	b, err := term.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Println()
+	fd := int(os.Stdin.Fd())
+	oldState, err := term.MakeRaw(fd)
 	if err != nil {
-		log.Fatalf("read password: %v", err)
+		log.Fatalf("terminal raw mode: %v", err)
 	}
-	return strings.TrimSpace(string(b))
+	defer term.Restore(fd, oldState)
+
+	var pw []byte
+	buf := make([]byte, 1)
+	for {
+		if _, err := os.Stdin.Read(buf); err != nil {
+			log.Fatalf("read password: %v", err)
+		}
+		switch buf[0] {
+		case '\r', '\n':
+			fmt.Print("\r\n")
+			return strings.TrimSpace(string(pw))
+		case 3: // Ctrl-C
+			fmt.Print("\r\n")
+			os.Exit(1)
+			return ""
+		case 127, 8: // backspace, delete
+			if len(pw) > 0 {
+				pw = pw[:len(pw)-1]
+				fmt.Print("\b \b")
+			}
+		default:
+			pw = append(pw, buf[0])
+			fmt.Print("●")
+		}
+	}
 }
