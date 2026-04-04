@@ -97,28 +97,42 @@ func Setup(binPath string) error {
 		return fmt.Errorf("write plist: %w", err)
 	}
 
-	// Unload first in case a previous version was loaded
-	_ = exec.Command("launchctl", "unload", path).Run()
+	uid := os.Getuid()
+	domain := fmt.Sprintf("gui/%d", uid)
+	target := fmt.Sprintf("gui/%d/%s", uid, plistName)
 
-	if err := exec.Command("launchctl", "load", path).Run(); err != nil {
-		return fmt.Errorf("launchctl load: %w", err)
+	// Remove any previously loaded service
+	_ = exec.Command("launchctl", "bootout", target).Run()
+
+	// Bootstrap (load + start) using modern launchctl
+	if err := exec.Command("launchctl", "bootstrap", domain, path).Run(); err != nil {
+		// Fallback to legacy load for older macOS
+		if err2 := exec.Command("launchctl", "load", path).Run(); err2 != nil {
+			return fmt.Errorf("launchctl: %w", err2)
+		}
 	}
 
-	// Explicitly start in case RunAtLoad didn't trigger
-	_ = exec.Command("launchctl", "start", plistName).Run()
+	// Force-start the service to ensure it's running now
+	_ = exec.Command("launchctl", "kickstart", "-k", target).Run()
 
 	return nil
 }
 
 func Stop() error {
-	path := plistPath()
-	if err := exec.Command("launchctl", "unload", path).Run(); err != nil {
-		return fmt.Errorf("stop service: %w", err)
+	target := fmt.Sprintf("gui/%d/%s", os.Getuid(), plistName)
+	if err := exec.Command("launchctl", "bootout", target).Run(); err != nil {
+		// Fallback to legacy unload
+		path := plistPath()
+		if err2 := exec.Command("launchctl", "unload", path).Run(); err2 != nil {
+			return fmt.Errorf("stop service: %w", err2)
+		}
 	}
 	return nil
 }
 
 func Remove() error {
+	target := fmt.Sprintf("gui/%d/%s", os.Getuid(), plistName)
+	_ = exec.Command("launchctl", "bootout", target).Run()
 	path := plistPath()
 	_ = exec.Command("launchctl", "unload", path).Run()
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
