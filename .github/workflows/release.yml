@@ -45,19 +45,19 @@ jobs:
           path: acopy-darwin-arm64
 
   build-darwin-amd64:
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install libvips
-        run: brew install vips
       - name: Build
         env:
+          CGO_ENABLED: "0"
           GOOS: darwin
           GOARCH: amd64
-        run: go build -tags vips -trimpath -ldflags="-s -w -X main.Version=${GITHUB_REF_NAME}" -o acopy-darwin-amd64 ./cmd/acopy
+        run: go build -trimpath -ldflags="-s -w -X main.Version=${GITHUB_REF_NAME}" -o acopy-darwin-amd64 ./cmd/acopy
+        # Intel Mac uses pure Go fallback (cross-compile without CGO)
       - uses: actions/upload-artifact@v4
         with:
           name: acopy-darwin-amd64
