@@ -70,11 +70,7 @@ func cmdStart() {
 	cfg.ServerURL = "https://acopy.org"
 	if cfg.Token == "" {
 		fmt.Println("not configured, running setup...")
-		cmdSetup()
-		cfg, err = config.Load()
-		if err != nil {
-			log.Fatalf("load config: %v", err)
-		}
+		loginSetup(cfg)
 	}
 	if cfg.DeviceName == "" {
 		cfg.DeviceName, _ = os.Hostname()
@@ -105,12 +101,7 @@ func cmdStart() {
 	mon.Run()
 }
 
-func cmdSetup() {
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatalf("load config: %v", err)
-	}
-
+func loginSetup(cfg *config.Config) {
 	cfg.ServerURL = "https://acopy.org"
 
 	// Prompt for device name
@@ -140,6 +131,15 @@ func cmdSetup() {
 		}
 		fmt.Println("logged in")
 	}
+}
+
+func cmdSetup() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+
+	loginSetup(cfg)
 
 	// Install service
 	bin, err := os.Executable()
