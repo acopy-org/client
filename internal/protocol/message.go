@@ -39,7 +39,8 @@ const (
 // Payloads
 
 type AuthPayload struct {
-	Token string `msgpack:"token"`
+	Token  string `msgpack:"token"`
+	Device string `msgpack:"device,omitempty"`
 }
 
 type ClipboardPushPayload struct {

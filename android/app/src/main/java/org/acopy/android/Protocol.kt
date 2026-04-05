@@ -31,7 +31,7 @@ enum class MsgType(val value: Byte) {
     }
 }
 
-data class AuthPayload(val token: String)
+data class AuthPayload(val token: String, val device: String = "")
 data class ClipboardPushPayload(val content: ByteArray, val device: String, val contentType: String = "text/plain")
 data class ClipboardBroadcastPayload(val id: String = "", val content: ByteArray, val device: String, val contentType: String = "text/plain", val ts: Long = 0)
 data class ErrorPayload(val code: Int, val msg: String)
@@ -87,12 +87,17 @@ object Codec {
 
     // --- msgpack encoding helpers ---
 
-    fun encodeAuth(token: String): ByteArray {
+    fun encodeAuth(token: String, device: String = ""): ByteArray {
         val out = ByteArrayOutputStream()
         MessagePack.newDefaultPacker(out).use { packer ->
-            packer.packMapHeader(1)
+            val fields = if (device.isNotEmpty()) 2 else 1
+            packer.packMapHeader(fields)
             packer.packString("token")
             packer.packString(token)
+            if (device.isNotEmpty()) {
+                packer.packString("device")
+                packer.packString(device)
+            }
         }
         return out.toByteArray()
     }

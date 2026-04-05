@@ -97,7 +97,7 @@ class SyncClient(
         client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.d(TAG, "websocket open, sending auth")
-                val authPayload = Codec.encodeAuth(token)
+                val authPayload = Codec.encodeAuth(token, deviceName)
                 val frame = Codec.encode(MsgType.AUTH, authPayload)
                 webSocket.send(frame.toByteString())
             }

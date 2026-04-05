@@ -240,7 +240,7 @@ func (c *Client) connect() error {
 	c.connMu.Unlock()
 
 	// Authenticate and wait for Ack
-	if err := c.sendFrame(protocol.MsgAuth, &protocol.AuthPayload{Token: c.token}); err != nil {
+	if err := c.sendFrame(protocol.MsgAuth, &protocol.AuthPayload{Token: c.token, Device: c.device}); err != nil {
 		c.closeConn()
 		return fmt.Errorf("send auth: %w", err)
 	}

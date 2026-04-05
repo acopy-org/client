@@ -121,3 +121,7 @@ cp acopy ~/.local/bin/         # Linux
 ```
 
 After building, run `acopy setup` to register and install as a system service.
+
+## License
+
+MIT

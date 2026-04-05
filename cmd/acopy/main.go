@@ -275,6 +275,7 @@ func cmdStatus() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
+	fmt.Printf("version: %s\n", Version)
 	fmt.Printf("server:  %s\n", cfg.ServerURL)
 	fmt.Printf("device:  %s\n", cfg.DeviceName)
 	if cfg.Token != "" {
