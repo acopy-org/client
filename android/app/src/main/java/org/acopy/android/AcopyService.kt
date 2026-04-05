@@ -100,6 +100,16 @@ class AcopyService : Service() {
                     Log.d(TAG, "Device renamed: $oldName -> $newName")
                 }
             },
+            onDeviceDeleted = { deviceId ->
+                if (deviceId == config.deviceId) {
+                    Log.d(TAG, "This device was removed remotely, stopping service")
+                    config.token = ""
+                    config.deviceName = ""
+                    config.deviceId = ""
+                    sendBroadcast(Intent(ACTION_DEVICE_DELETED).setPackage(packageName))
+                    stopSelf()
+                }
+            },
             onDeviceId = { deviceId ->
                 config.deviceId = deviceId
                 Log.d(TAG, "Device ID: $deviceId")
@@ -170,6 +180,7 @@ class AcopyService : Service() {
         const val ACTION_STATUS = "org.acopy.android.STATUS"
         const val ACTION_PUSH_CLIPBOARD = "org.acopy.android.PUSH_CLIPBOARD"
         const val ACTION_DEVICE_RENAMED = "org.acopy.android.DEVICE_RENAMED"
+        const val ACTION_DEVICE_DELETED = "org.acopy.android.DEVICE_DELETED"
         const val EXTRA_STATUS = "status"
         const val EXTRA_CLIPBOARD = "clipboard"
         const val EXTRA_CONTENT_TYPE = "content_type"

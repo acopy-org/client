@@ -20,6 +20,7 @@ class SyncClient(
     private val onConnectionState: (connected: Boolean) -> Unit,
     private val onError: (msg: String) -> Unit,
     private val onDeviceRenamed: (oldName: String, newName: String) -> Unit = { _, _ -> },
+    private val onDeviceDeleted: (deviceId: String) -> Unit = {},
     private val onDeviceId: (deviceId: String) -> Unit = {}
 ) {
     private val client = OkHttpClient.Builder()
@@ -173,6 +174,7 @@ class SyncClient(
             MsgType.DEVICE_DELETED -> {
                 val payload = Codec.decodeDeviceDeleted(raw)
                 Log.d(TAG, "device deleted: ${payload.deviceId}")
+                onDeviceDeleted(payload.deviceId)
             }
             else -> Log.w(TAG, "unexpected message type: $msgType")
         }

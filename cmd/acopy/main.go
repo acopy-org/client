@@ -150,6 +150,21 @@ func cmdStart(debug bool) {
 	}
 
 	client.OnDeviceDeleted = func(deviceID string) {
+		if deviceID == cfg.DeviceID {
+			log.Printf("this device was removed remotely, shutting down")
+			mon.Stop()
+			client.Stop()
+			if err := service.Remove(); err != nil {
+				log.Printf("service remove: %v", err)
+			}
+			// Clear config
+			cfg.Token = ""
+			cfg.DeviceName = ""
+			cfg.DeviceID = ""
+			cfg.Save()
+			removeShims()
+			os.Exit(0)
+		}
 		log.Printf("a device was removed (id: %s)", deviceID)
 	}
 
