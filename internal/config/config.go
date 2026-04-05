@@ -13,6 +13,15 @@ type Config struct {
 	DeviceName string `toml:"device_name"`
 	Token      string `toml:"token"`
 	DeviceID   string `toml:"device_id,omitempty"`
+	AutoUpdate *bool  `toml:"auto_update,omitempty"`
+}
+
+// AutoUpdateEnabled returns whether auto-update is enabled (default: true).
+func (c *Config) AutoUpdateEnabled() bool {
+	if c.AutoUpdate == nil {
+		return true
+	}
+	return *c.AutoUpdate
 }
 
 func Dir() (string, error) {

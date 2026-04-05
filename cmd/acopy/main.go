@@ -22,6 +22,7 @@ import (
 	"github.com/riz/acopy-client/internal/monitor"
 	"github.com/riz/acopy-client/internal/service"
 	acSync "github.com/riz/acopy-client/internal/sync"
+	"github.com/riz/acopy-client/internal/updater"
 )
 
 // Version is set at build time via -ldflags
@@ -70,6 +71,8 @@ func main() {
 		cmdPaste()
 	case "install-shims":
 		cmdInstallShims()
+	case "update":
+		cmdUpdate()
 	case "version", "--version", "-v":
 		fmt.Println("acopy " + Version)
 	default:
@@ -89,6 +92,7 @@ commands:
   status      Show config and service status
   copy          Push stdin to clipboard (e.g. echo hi | acopy copy)
   paste         Output latest clipboard to stdout
+  update        Check for updates and apply if available
   install-shims Create xclip/xsel/pbcopy/pbpaste symlinks
   start         Start clipboard sync (foreground)
   start debug   Start with verbose timestamped logging
@@ -178,6 +182,11 @@ func cmdStart(debug bool) {
 		client.Stop()
 		os.Exit(0)
 	}()
+
+	// Start auto-updater
+	if cfg.AutoUpdateEnabled() {
+		updater.Run(Version)
+	}
 
 	// Start WebSocket connection in background
 	go client.Run()
@@ -301,6 +310,12 @@ func cmdStatus() {
 
 	svc, _ := service.Status()
 	fmt.Printf("service: %s\n", svc)
+}
+
+func cmdUpdate() {
+	if updater.RunOnce(Version) {
+		fmt.Println("restart the service to use the new version: acopy stop && acopy setup")
+	}
 }
 
 func cmdCopy() {

@@ -19,6 +19,7 @@ Wants=network-online.target
 Type=simple
 ExecStart={{ .BinPath }} start
 Restart=on-failure
+RestartForceExitStatus=42
 RestartSec=5
 Environment=DISPLAY=:0
 
